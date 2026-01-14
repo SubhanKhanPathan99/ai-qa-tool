@@ -11,21 +11,25 @@ st.set_page_config(
     layout="wide"
 )
 
-# 2. ADVANCED CSS: REMOVING TOP WHITE SPACE & BACKGROUND ANIMATION
+# 2. ADVANCED CSS: FIXING TITLE & SIDEBAR GAPS
 st.markdown("""
     <style>
-    /* REMOVE TOP EMPTY SPACE */
+    /* REMOVE GLOBAL TOP PADDING */
     .block-container {
-        padding-top: 0rem !important;
-        margin-top: -2rem !important;
+        padding-top: 1rem !important;
         max-width: 95%;
+    }
+
+    /* FIX SIDEBAR: Remove the empty top-margin/box */
+    [data-testid="stSidebar"] > div:first-child {
+        padding-top: 0rem !important;
     }
 
     /* ANIMATED PROFESSIONAL BACKGROUND */
     .stApp {
-        background: linear-gradient(-45deg, #f1f5f9, #e2e8f0, #cbd5e1, #94a3b8);
+        background: linear-gradient(-45deg, #f8fafc, #f1f5f9, #e2e8f0, #cbd5e1);
         background-size: 400% 400%;
-        animation: gradientBG 20s ease infinite;
+        animation: gradientBG 15s ease infinite;
     }
     @keyframes gradientBG {
         0% { background-position: 0% 50%; }
@@ -33,29 +37,33 @@ st.markdown("""
         100% { background-position: 0% 50%; }
     }
 
-    /* GLASSMORPHISM BOXES - Prevents 'Empty Box' look */
-    .stMarkdown div[data-testid="stVerticalBlock"] {
-        gap: 0rem;
-    }
-    
-    .glass-card {
-        background: rgba(255, 255, 255, 0.7);
-        backdrop-filter: blur(10px);
-        border-radius: 15px;
-        padding: 25px;
-        border: 1px solid rgba(255, 255, 255, 0.3);
-        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-        margin-bottom: 20px;
+    /* HERO TITLE STYLING - Ensures visibility */
+    .hero-title {
+        font-size: 3.5rem;
+        font-weight: 900;
+        color: #1e293b;
+        text-align: center;
+        margin-top: 0px;
+        margin-bottom: 0px;
+        padding-top: 0px;
     }
 
-    /* HEADER STYLING */
-    .hero-title {
-        font-size: 3.8rem;
-        font-weight: 900;
-        color: #0f172a;
+    .hero-tagline {
+        font-size: 1.2rem;
+        color: #475569;
         text-align: center;
-        letter-spacing: -1px;
-        margin-bottom: 0px;
+        margin-bottom: 2rem;
+    }
+
+    /* BUTTON STYLING */
+    .stButton>button {
+        width: 100%;
+        border-radius: 12px;
+        height: 3.5rem;
+        background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%);
+        color: white;
+        font-weight: bold;
+        border: none;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -63,14 +71,14 @@ st.markdown("""
 # 3. SECURE API INITIALIZATION
 if "GEMINI_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    model = genai.GenerativeModel('gemini-1.5-flash-latest')
+    model = genai.GenerativeModel('gemini-flash-latest')
 else:
     st.error("API Key Missing in Secrets.")
     st.stop()
 
-# 4. SIDEBAR - CONTROL PANEL
+# 4. SIDEBAR - CLEAN CONTROL PANEL
+# We start immediately with the title to avoid the 'empty box' at the top
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/2092/2092215.png", width=60)
     st.title("Control Panel")
     st.divider()
 
@@ -88,15 +96,12 @@ with st.sidebar:
     st.divider()
     st.success("System: Ready ✅")
 
-# 5. MAIN HEADER SECTION
-# We wrap the title in a container to ensure proper spacing
-st.markdown('<p class="hero-title">TestcaseCraft Pro</p>', unsafe_allow_html=True)
-st.markdown("<p style='text-align:center; color:#475569; font-size:1.2rem; margin-bottom:2rem;'>Enterprise-Grade AI Engine for QA Requirement Analysis</p>", unsafe_allow_html=True)
+# 5. MAIN PAGE TITLE (Visible & Centered)
+st.markdown('<h1 class="hero-title">TestcaseCraft Pro</h1>', unsafe_allow_html=True)
+st.markdown('<p class="hero-tagline">Enterprise-Grade AI Engine for QA Requirement Analysis</p>', unsafe_allow_html=True)
 
-# 6. FILE UPLOAD INTERFACE
-# Only show the upload card initially
-with st.container():
-    uploaded_file = st.file_uploader("Upload BRD (PDF Format)", type="pdf")
+# 6. MAIN WORKSPACE
+uploaded_file = st.file_uploader("Upload Business Requirement Document (PDF)", type="pdf")
 
 if uploaded_file:
     reader = PdfReader(uploaded_file)
@@ -104,34 +109,24 @@ if uploaded_file:
 
     if st.button("🚀 Analyze and Generate Matrix"):
         with st.status("AI Analysis in Progress...", expanded=True) as status:
-            st.write("Reading PDF content...")
-            
             prompt = f"""
             Act as a Senior QA Lead. Generate a professional test case matrix.
             OUTPUT ONLY A MARKDOWN TABLE.
-            
             Style: {test_framework}. Focus: {priority_focus}. Depth: {detail_level}.
             Include Negative: {include_neg}. Include Edge: {include_edge}.
-            
             Columns: ID, Type, Requirement Ref, Description, Expected Result, Priority.
-            
-            BRD: {text[:12000]}
+            BRD CONTENT: {text[:12000]}
             """
-            
             try:
                 response = model.generate_content(prompt)
                 status.update(label="Analysis Complete!", state="complete", expanded=False)
-
-                # 7. DYNAMIC RESULTS - Only appears when ready
+                
                 st.markdown("---")
                 st.subheader("📊 Generated Test Matrix")
-                
-                # Render table
                 st.markdown(response.text)
                 
-                # EXPORT ACTION
                 st.download_button(
-                    label="📥 Download CSV",
+                    label="📥 Export Matrix to CSV",
                     data=response.text,
                     file_name="QA_Matrix.csv",
                     mime="text/csv"
@@ -139,5 +134,4 @@ if uploaded_file:
             except Exception as e:
                 st.error(f"Error: {e}")
 else:
-    # This info box replaces the "Empty Box" until a file is uploaded
     st.info("👋 Welcome! Please upload your PDF document to activate the analysis engine.")
