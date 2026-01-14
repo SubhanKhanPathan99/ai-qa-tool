@@ -2,80 +2,69 @@ import streamlit as st
 import google.generativeai as genai
 from PyPDF2 import PdfReader
 import pandas as pd
-import time
+import io
 
 # 1. PAGE SETUP
 st.set_page_config(page_title="TestcaseCraft Pro", layout="wide", page_icon="🧪")
 
-# 2. ADVANCED CSS (Glassmorphism & Professional Styling)
+# 2. CUSTOM CSS FOR TABLE STYLING
 st.markdown("""
     <style>
-    .stApp { background: #fdfdfd; }
-    .main-title { font-size: 3.5rem; font-weight: 800; color: #1E3A8A; text-align: center; padding-top: 2rem; }
-    .stButton>button { width: 100%; border-radius: 20px; border: none; background: linear-gradient(90deg, #1E3A8A 0%, #3B82F6 100%); color: white; transition: 0.3s; }
-    .stButton>button:hover { transform: scale(1.02); }
+    .stDataFrame { border: 1px solid #e6e9ef; border-radius: 10px; }
+    .main-title { font-size: 3rem; font-weight: 800; color: #1E3A8A; text-align: center; }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. SECURE API LOADING
+# 3. API INITIALIZATION
 if "GEMINI_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    model = genai.GenerativeModel('gemini-flash-latest')
+    model = genai.GenerativeModel('gemini-1.5-flash')
 else:
-    st.error("Secrets missing: GEMINI_API_KEY")
+    st.error("Missing GEMINI_API_KEY in Secrets.")
     st.stop()
 
-# 4. SIDEBAR BRANDING
+# 4. SIDEBAR CONFIG
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/2092/2092215.png", width=80)
     st.title("Settings")
-    detail_level = st.radio("Test Granularity", ["High-Level", "Detailed", "Technical"])
-    include_negative = st.toggle("Negative Scenarios", value=True)
-    st.divider()
-    st.info("Status: Engine Online ✅")
+    detail_level = st.select_slider("Granularity", options=["High-Level", "Detailed"])
+    include_neg = st.toggle("Negative Scenarios", value=True)
+    st.info("Engine: Gemini 1.5 Flash ✅")
 
-# 5. MAIN CONTENT
+# 5. MAIN INTERFACE
 st.markdown('<p class="main-title">TestcaseCraft Pro</p>', unsafe_allow_html=True)
-
-# Advanced Metrics Row
-m1, m2, m3 = st.columns(3)
-m1.metric("Model", "Gemini 1.5 Flash")
-m2.metric("Speed", "Instant")
-m3.metric("Type", "QA Expert")
-
-uploaded_file = st.file_uploader("", type="pdf")
+uploaded_file = st.file_uploader("Upload Business Requirement Document (PDF)", type="pdf")
 
 if uploaded_file:
-    # PDF Processing
     reader = PdfReader(uploaded_file)
     text = "".join([p.extract_text() for p in reader.pages])
-    
-    # Progress Container
-    if st.button("🚀 Generate Professional Matrix"):
-        with st.status("Analyzing Document...", expanded=True) as status:
-            st.write("Reading PDF content...")
-            time.sleep(1)
-            st.write("Identifying functional requirements...")
-            time.sleep(1)
-            st.write("Generating positive and negative paths...")
-            
-            prompt = f"Act as a Senior QA Manager. Analyze this BRD and generate a test matrix in CSV format (ID, Type, Desc, Expected, Priority). Detail: {detail_level}. Negative cases: {include_negative}. BRD: {text[:10000]}"
-            response = model.generate_content(prompt)
-            status.update(label="Analysis Complete!", state="complete", expanded=False)
 
-        # 6. RESULTS SECTION
-        st.subheader("📊 Requirement Coverage Matrix")
+    if st.button("🚀 Generate Structured Test Matrix"):
+        with st.status("Analyzing and Formatting Table...") as status:
+            # THE PROMPT IS KEY: We specify Markdown Table format explicitly
+            prompt = f"""
+            Act as a Senior QA Lead. Create a structured Test Case Matrix from this BRD.
+            OUTPUT ONLY A MARKDOWN TABLE. Do not include conversational text.
+            
+            Columns: ID, Type (Positive/Negative), Requirement Reference, Description, Expected Result, Priority.
+            Detail Level: {detail_level}. Include Negative Scenarios: {include_neg}.
+            
+            BRD Content: {text[:10000]}
+            """
+            
+            response = model.generate_content(prompt)
+            status.update(label="Table Generated!", state="complete", expanded=False)
+
+        # 6. ORGANIZED DISPLAY SECTION
+        st.subheader("📊 Final Test Case Matrix")
         
-        # Display as a clean table (AI needs to output markdown table for this to work best)
+        # We display the raw markdown as a table
         st.markdown(response.text)
         
-        # Download Action
+        # 7. EXPORT SECTION (Download as CSV)
+        st.divider()
         st.download_button(
-            label="📥 Export to CSV / Excel",
+            label="📥 Download Matrix for Excel/Jira",
             data=response.text,
-            file_name="QA_Matrix_Pro.csv",
+            file_name="QA_Test_Matrix.csv",
             mime="text/csv"
         )
-
-
-
