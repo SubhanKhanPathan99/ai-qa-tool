@@ -4,23 +4,35 @@ from PyPDF2 import PdfReader
 import pandas as pd
 
 # 1. Page Configuration
-st.set_page_config(page_title="AI QA Assistant", layout="wide")
+st.set_page_config(page_title="AI QA Assistant", layout="wide", page_icon="🤖")
+
+# 2. Secure API Key Management
+# This block prevents NameError by defining api_key at the start
+if "GEMINI_API_KEY" in st.secrets:
+    api_key = st.secrets["GEMINI_API_KEY"]
+else:
+    # If the key is missing from secrets, show a clear error and stop
+    st.error("❌ API Key not found! Please add 'GEMINI_API_KEY' to your Streamlit Secrets.")
+    st.stop()
+
+# 3. Header and UI
 st.title("📄 BRD to Test Case Generator")
 st.markdown("Upload a Business Requirement Document to generate structured test cases automatically.")
 
-# 2. Sidebar for Configuration
-st.sidebar.header("Settings")
-api_key = st.sidebar.text_input("Enter Gemini API Key", type="password")
-st.sidebar.info("Get your key at: https://aistudio.google.com/")
+# Sidebar for feedback/status
+st.sidebar.header("System Status")
+st.sidebar.success("API Key loaded securely ✅")
+st.sidebar.info("Model: Gemini-1.5-Flash")
 
-# 3. File Uploader
+# 4. File Uploader
 uploaded_file = st.file_uploader("Upload BRD (PDF Format)", type="pdf")
 
-if uploaded_file and api_key:
+if uploaded_file:
     try:
-        # Initialize Gemini
+        # Initialize Gemini with the secret key
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-flash-latest')
+        # Using the most stable flash model name
+        model = genai.GenerativeModel('gemini-1.5-flash')
 
         # Extract Text from PDF
         reader = PdfReader(uploaded_file)
@@ -30,30 +42,34 @@ if uploaded_file and api_key:
 
         if st.button("Generate Test Cases"):
             with st.spinner("Analyzing requirements and generating test cases..."):
-                # AI Prompt
+                # Enhanced AI Prompt for Negative and Positive cases
                 prompt = f"""
                 Act as a Senior QA Engineer. Analyze the following Business Requirement Document (BRD) 
                 and generate a comprehensive test case matrix.
                 
-                IMPORTANT: You must include both Positive (Happy Path) and Negative (Boundary/Invalid/Error) test cases.
-                
-                For Negative Test Cases, focus on:
-                - Invalid data formats or missing mandatory fields.
-                - Exceeding character limits or unauthorized access.
-                - System behavior when external services fail.
+                Include BOTH Positive (Happy Path) and Negative (Invalid/Boundary) test cases.
+                Focus Negative cases on: missing data, unauthorized access, and invalid formats.
 
-                Include the following columns: 
-                Test Case ID, Type (Positive/Negative), Requirement Reference, Description, Expected Result, and Priority.
+                Format the output as a clean table with these columns: 
+                Test Case ID, Type (Positive/Negative), Requirement Reference, Description, Expected Result, Priority.
                 
                 BRD Text:
                 {full_text[:15000]} 
                 """
                 
                 response = model.generate_content(prompt)
-                st.subheader("Generated Test Cases")
-                st.write(response.text)
+                st.subheader("Generated Test Case Matrix")
+                st.markdown(response.text) # Using markdown for table rendering
+                
+                # Optional: Add a simple way to copy/download
+                st.download_button(
+                    label="📥 Download Results as Text",
+                    data=response.text,
+                    file_name="test_cases.txt",
+                    mime="text/plain"
+                )
                 
     except Exception as e:
         st.error(f"An error occurred: {e}")
 else:
-    st.warning("Please provide both an API Key and a PDF file to proceed.")
+    st.info("👋 Welcome! Please upload a PDF file to begin generating test cases.")
