@@ -1,26 +1,33 @@
 import streamlit as st
 import google.generativeai as genai
 from PyPDF2 import PdfReader
-import google.api_core.exceptions
-import time
+import pandas as pd
+import io
 
-# 1. PAGE CONFIG & THEME
-st.set_page_config(page_title="TestcaseCraft Pro", page_icon="🧪", layout="wide")
+# 1. PAGE CONFIGURATION
+st.set_page_config(
+    page_title="TestcaseCraft Pro | Enterprise QA",
+    page_icon="🧪",
+    layout="wide"
+)
 
-# 2. CSS RESET: Fixes Sidebar Gaps, Blank Spaces, and Adds Animation
+# 2. ADVANCED CSS: FIXING TITLE & SIDEBAR GAPS
 st.markdown("""
     <style>
-    /* Force Title and Sidebar to the absolute top */
-    .block-container { padding-top: 0rem !important; margin-top: -2rem !important; }
-    [data-testid="stSidebar"] > div:first-child { padding-top: 0rem !important; }
-    
-    /* Remove the 'Empty Box' look in Sidebar */
-    [data-testid="stSidebarNav"] { display: none; }
-    div[data-testid="stVerticalBlock"] > div { margin-top: -1rem; }
+    /* REMOVE GLOBAL TOP PADDING */
+    .block-container {
+        padding-top: 1rem !important;
+        max-width: 95%;
+    }
 
-    /* Professional Animated Background */
+    /* FIX SIDEBAR: Remove the empty top-margin/box */
+    [data-testid="stSidebar"] > div:first-child {
+        padding-top: 0rem !important;
+    }
+
+    /* ANIMATED PROFESSIONAL BACKGROUND */
     .stApp {
-        background: linear-gradient(-45deg, #f1f5f9, #e2e8f0, #cbd5e1, #94a3b8);
+        background: linear-gradient(-45deg, #f8fafc, #f1f5f9, #e2e8f0, #cbd5e1);
         background-size: 400% 400%;
         animation: gradientBG 15s ease infinite;
     }
@@ -29,67 +36,102 @@ st.markdown("""
         50% { background-position: 100% 50%; }
         100% { background-position: 0% 50%; }
     }
-    
-    /* Hero Title Style */
-    .hero-title { font-size: 3.5rem; font-weight: 900; color: #0f172a; text-align: center; margin: 0; }
+
+    /* HERO TITLE STYLING - Ensures visibility */
+    .hero-title {
+        font-size: 3.5rem;
+        font-weight: 900;
+        color: #1e293b;
+        text-align: center;
+        margin-top: 0px;
+        margin-bottom: 0px;
+        padding-top: 0px;
+    }
+
+    .hero-tagline {
+        font-size: 1.2rem;
+        color: #475569;
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    /* BUTTON STYLING */
+    .stButton>button {
+        width: 100%;
+        border-radius: 12px;
+        height: 3.5rem;
+        background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%);
+        color: white;
+        font-weight: bold;
+        border: none;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. API INITIALIZATION
+# 3. SECURE API INITIALIZATION
 if "GEMINI_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    model = genai.GenerativeModel('gemini-1.5-flash-latest')
+    model = genai.GenerativeModel('gemini-2.5-flash')
 else:
-    st.error("API Key Missing in Secrets Management.")
+    st.error("API Key Missing in Secrets.")
     st.stop()
 
-# 4. SIDEBAR - CONTROL PANEL (Starts immediately to avoid empty boxes)
+# 4. SIDEBAR - CLEAN CONTROL PANEL
+# We start immediately with the title to avoid the 'empty box' at the top
 with st.sidebar:
     st.title("Control Panel")
     st.divider()
-    st.subheader("🛠️ Settings")
+
+    st.subheader("🛠️ Core Settings")
     detail_level = st.select_slider("Analysis Depth", options=["Standard", "Detailed", "Exhaustive"])
-    test_framework = st.selectbox("Framework", ["Standard Manual", "Cucumber/Gherkin", "PyTest"])
+    
+    st.subheader("🎯 Test Strategy")
+    test_framework = st.selectbox("Preferred Framework", ["Standard Manual", "Cucumber/Gherkin", "PyTest/Robot"])
+    priority_focus = st.multiselect("Priority Focus", ["Security", "UI/UX", "API", "Performance"], default=["UI/UX"])
+    
+    st.subheader("🧪 Scenarios")
     include_neg = st.toggle("Negative Scenarios", value=True)
+    include_edge = st.toggle("Edge Case Analysis", value=True)
+    
     st.divider()
     st.success("System: Ready ✅")
 
-# 5. MAIN CONTENT
+# 5. MAIN PAGE TITLE (Visible & Centered)
 st.markdown('<h1 class="hero-title">TestcaseCraft Pro</h1>', unsafe_allow_html=True)
-st.markdown("<p style='text-align:center; color:#475569;'>Enterprise AI for QA Requirement Analysis</p>", unsafe_allow_html=True)
+st.markdown('<p class="hero-tagline">Enterprise-Grade AI Engine for QA Requirement Analysis</p>', unsafe_allow_html=True)
 
-# 6. CACHED GENERATION FUNCTION (Saves your Quota)
-@st.cache_data(show_spinner=False)
-def get_ai_response(pdf_text, detail, framework, neg_toggle):
-    prompt = f"Act as a QA Lead. Generate a markdown table matrix for this BRD. Style: {framework}. Depth: {detail}. Include Negative: {neg_toggle}. BRD: {pdf_text[:10000]}"
-    return model.generate_content(prompt)
-
-uploaded_file = st.file_uploader("Upload BRD (PDF)", type="pdf")
+# 6. MAIN WORKSPACE
+uploaded_file = st.file_uploader("Upload Business Requirement Document (PDF)", type="pdf")
 
 if uploaded_file:
     reader = PdfReader(uploaded_file)
     text = "".join([p.extract_text() for p in reader.pages])
 
-    if st.button("🚀 Analyze Requirements"):
-        try:
-            with st.status("AI Analysis in Progress...") as status:
-                # Use the cached function to avoid 429 errors on repeat runs
-                response = get_ai_response(text, detail_level, test_framework, include_neg)
-                
-                if not response.candidates:
-                    st.error("AI Response Blocked. Try a different file.")
-                    st.stop()
-                    
+    if st.button("🚀 Analyze and Generate Matrix"):
+        with st.status("AI Analysis in Progress...", expanded=True) as status:
+            prompt = f"""
+            Act as a Senior QA Lead. Generate a professional test case matrix.
+            OUTPUT ONLY A MARKDOWN TABLE.
+            Style: {test_framework}. Focus: {priority_focus}. Depth: {detail_level}.
+            Include Negative: {include_neg}. Include Edge: {include_edge}.
+            Columns: ID, Type, Requirement Ref, Description, Expected Result, Priority.
+            BRD CONTENT: {text[:12000]}
+            """
+            try:
+                response = model.generate_content(prompt)
                 status.update(label="Analysis Complete!", state="complete", expanded=False)
-
-            st.markdown("### 📊 Generated Test Matrix")
-            st.markdown(response.text)
-            st.download_button("📥 Download CSV", response.text, "QA_Matrix.csv", "text/csv")
-
-        except google.api_core.exceptions.ResourceExhausted:
-            st.error("⚠️ AI Quota Exceeded (Error 429).")
-            st.info("The Free Tier limit is 15 requests per minute. Please wait 60 seconds and try again.")
-        except Exception as e:
-            st.error(f"System Error: {e}")
+                
+                st.markdown("---")
+                st.subheader("📊 Generated Test Matrix")
+                st.markdown(response.text)
+                
+                st.download_button(
+                    label="📥 Export Matrix to CSV",
+                    data=response.text,
+                    file_name="QA_Matrix.csv",
+                    mime="text/csv"
+                )
+            except Exception as e:
+                st.error(f"Error: {e}")
 else:
-    st.info("👋 Welcome! Please upload your PDF document to begin.")
+    st.info("👋 Welcome! Please upload your PDF document to activate the analysis engine.")
