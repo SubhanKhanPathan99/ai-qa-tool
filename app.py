@@ -2,115 +2,80 @@ import streamlit as st
 import google.generativeai as genai
 from PyPDF2 import PdfReader
 import pandas as pd
-import io
+import time
 
-# 1. PAGE CONFIGURATION & THEME
-st.set_page_config(
-    page_title="TestcaseCraft AI",
-    page_icon="🤖",
-    layout="wide"
-)
+# 1. PAGE SETUP
+st.set_page_config(page_title="TestcaseCraft Pro", layout="wide", page_icon="🧪")
 
-# Custom CSS for a professional look
+# 2. ADVANCED CSS (Glassmorphism & Professional Styling)
 st.markdown("""
     <style>
-    .main-header {
-        font-size: 3rem;
-        font-weight: 800;
-        color: #007BFF;
-        text-align: center;
-        margin-bottom: 0px;
-    }
-    .sub-header {
-        font-size: 1.2rem;
-        color: #6c757d;
-        text-align: center;
-        margin-bottom: 30px;
-    }
-    .stButton>button {
-        width: 100%;
-        border-radius: 8px;
-        height: 3em;
-        background-color: #007BFF;
-        color: white;
-    }
+    .stApp { background: #fdfdfd; }
+    .main-title { font-size: 3.5rem; font-weight: 800; color: #1E3A8A; text-align: center; padding-top: 2rem; }
+    .stButton>button { width: 100%; border-radius: 20px; border: none; background: linear-gradient(90deg, #1E3A8A 0%, #3B82F6 100%); color: white; transition: 0.3s; }
+    .stButton>button:hover { transform: scale(1.02); }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. SECURE API KEY INITIALIZATION
+# 3. SECURE API LOADING
 if "GEMINI_API_KEY" in st.secrets:
-    api_key = st.secrets["GEMINI_API_KEY"]
-    genai.configure(api_key=api_key)
-    # Using stable model alias
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
     model = genai.GenerativeModel('gemini-flash-latest')
 else:
-    st.error("⚠️ API Key not found in Secrets! Please add 'GEMINI_API_KEY' to your Streamlit Cloud settings.")
+    st.error("Secrets missing: GEMINI_API_KEY")
     st.stop()
 
-# 3. FRONT-END UI ELEMENTS
-st.markdown('<p class="main-header">TestcaseCraft AI</p>', unsafe_allow_html=True)
-st.markdown('<p class="sub-header">Professional QA Requirement Analysis & Test Matrix Generator</p>', unsafe_allow_html=True)
+# 4. SIDEBAR BRANDING
+with st.sidebar:
+    st.image("https://cdn-icons-png.flaticon.com/512/2092/2092215.png", width=80)
+    st.title("Settings")
+    detail_level = st.radio("Test Granularity", ["High-Level", "Detailed", "Technical"])
+    include_negative = st.toggle("Negative Scenarios", value=True)
+    st.divider()
+    st.info("Status: Engine Online ✅")
 
-# Tabs for a clean interface
-tab1, tab2 = st.tabs(["🚀 Generator", "📖 Help & Instructions"])
+# 5. MAIN CONTENT
+st.markdown('<p class="main-title">TestcaseCraft Pro</p>', unsafe_allow_html=True)
 
-with tab1:
-    col1, col2 = st.columns([1, 1])
+# Advanced Metrics Row
+m1, m2, m3 = st.columns(3)
+m1.metric("Model", "Gemini 1.5 Flash")
+m2.metric("Speed", "Instant")
+m3.metric("Type", "QA Expert")
+
+uploaded_file = st.file_uploader("", type="pdf")
+
+if uploaded_file:
+    # PDF Processing
+    reader = PdfReader(uploaded_file)
+    text = "".join([p.extract_text() for p in reader.pages])
     
-    with col1:
-        st.subheader("Upload Requirements")
-        uploaded_file = st.file_uploader("Upload BRD (PDF Format)", type="pdf", help="Upload a business requirement document to start.")
+    # Progress Container
+    if st.button("🚀 Generate Professional Matrix"):
+        with st.status("Analyzing Document...", expanded=True) as status:
+            st.write("Reading PDF content...")
+            time.sleep(1)
+            st.write("Identifying functional requirements...")
+            time.sleep(1)
+            st.write("Generating positive and negative paths...")
+            
+            prompt = f"Act as a Senior QA Manager. Analyze this BRD and generate a test matrix in CSV format (ID, Type, Desc, Expected, Priority). Detail: {detail_level}. Negative cases: {include_negative}. BRD: {text[:10000]}"
+            response = model.generate_content(prompt)
+            status.update(label="Analysis Complete!", state="complete", expanded=False)
 
-    with col2:
-        st.subheader("Analysis Settings")
-        priority_level = st.select_slider("Select Detail Level", options=["Standard", "Detailed", "Exhaustive"])
-        include_neg = st.checkbox("Include Negative Test Cases", value=True)
+        # 6. RESULTS SECTION
+        st.subheader("📊 Requirement Coverage Matrix")
+        
+        # Display as a clean table (AI needs to output markdown table for this to work best)
+        st.markdown(response.text)
+        
+        # Download Action
+        st.download_button(
+            label="📥 Export to CSV / Excel",
+            data=response.text,
+            file_name="QA_Matrix_Pro.csv",
+            mime="text/csv"
+        )
 
-    if uploaded_file:
-        # Extract Text
-        reader = PdfReader(uploaded_file)
-        full_text = "".join([page.extract_text() for page in reader.pages])
 
-        if st.button("Generate Test Matrix"):
-            with st.spinner("🤖 AI is analyzing requirements..."):
-                # Enhanced Prompt for structured output
-                prompt = f"""
-                Act as a Senior QA Manager. Analyze the attached BRD and generate a professional test case matrix.
-                Include columns: ID, Type, Requirement, Description, Expected Result, Priority.
-                Include both Positive and {'Negative' if include_neg else ''} scenarios.
-                Focus on {priority_level} depth.
-                
-                BRD CONTENT:
-                {full_text[:15000]}
-                """
-                
-                response = model.generate_content(prompt)
-                
-                st.divider()
-                st.subheader("✅ Generated Test Case Matrix")
-                st.markdown(response.text)
-                
-                # DOWNLOAD FEATURE
-                st.download_button(
-                    label="📥 Download Test Cases as CSV",
-                    data=response.text,
-                    file_name="QA_Test_Matrix.csv",
-                    mime="text/csv"
-                )
 
-with tab2:
-    st.markdown("""
-    ### How to use this tool:
-    1. **Upload**: Drag and drop your Business Requirement Document (PDF).
-    2. **Configure**: Choose the detail level and whether you want negative cases.
-    3. **Generate**: Click the button and wait for the AI to build your table.
-    4. **Export**: Use the download button to save your cases for Excel or Jira.
-    
-    *Privacy Note: Your documents are processed in real-time and not stored on our servers.*
-    """)
-
-# Sidebar for branding/status
-st.sidebar.title("App Info")
-st.sidebar.success("Connection: Stable ✅")
-st.sidebar.info("Model: Gemini 1.5 Flash")
-st.sidebar.write("Developed for QA Professionals")
