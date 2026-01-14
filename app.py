@@ -32,7 +32,7 @@ if uploaded_file:
         # Initialize Gemini with the secret key
         genai.configure(api_key=api_key)
         # Using the most stable flash model name
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-flash-latest')
 
         # Extract Text from PDF
         reader = PdfReader(uploaded_file)
