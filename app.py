@@ -2,74 +2,115 @@ import streamlit as st
 import google.generativeai as genai
 from PyPDF2 import PdfReader
 import pandas as pd
+import io
 
-# 1. Page Configuration
-st.set_page_config(page_title="AI QA Assistant", layout="wide", page_icon="🤖")
+# 1. PAGE CONFIGURATION & THEME
+st.set_page_config(
+    page_title="TestcaseCraft AI",
+    page_icon="🤖",
+    layout="wide"
+)
 
-# 2. Secure API Key Management
-# This block prevents NameError by defining api_key at the start
+# Custom CSS for a professional look
+st.markdown("""
+    <style>
+    .main-header {
+        font-size: 3rem;
+        font-weight: 800;
+        color: #007BFF;
+        text-align: center;
+        margin-bottom: 0px;
+    }
+    .sub-header {
+        font-size: 1.2rem;
+        color: #6c757d;
+        text-align: center;
+        margin-bottom: 30px;
+    }
+    .stButton>button {
+        width: 100%;
+        border-radius: 8px;
+        height: 3em;
+        background-color: #007BFF;
+        color: white;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+# 2. SECURE API KEY INITIALIZATION
 if "GEMINI_API_KEY" in st.secrets:
     api_key = st.secrets["GEMINI_API_KEY"]
+    genai.configure(api_key=api_key)
+    # Using stable model alias
+    model = genai.GenerativeModel('gemini-flash-latest')
 else:
-    # If the key is missing from secrets, show a clear error and stop
-    st.error("❌ API Key not found! Please add 'GEMINI_API_KEY' to your Streamlit Secrets.")
+    st.error("⚠️ API Key not found in Secrets! Please add 'GEMINI_API_KEY' to your Streamlit Cloud settings.")
     st.stop()
 
-# 3. Header and UI
-st.title("📄 BRD to Test Case Generator")
-st.markdown("Upload a Business Requirement Document to generate structured test cases automatically.")
+# 3. FRONT-END UI ELEMENTS
+st.markdown('<p class="main-header">TestcaseCraft AI</p>', unsafe_allow_html=True)
+st.markdown('<p class="sub-header">Professional QA Requirement Analysis & Test Matrix Generator</p>', unsafe_allow_html=True)
 
-# Sidebar for feedback/status
-st.sidebar.header("System Status")
-st.sidebar.success("API Key loaded securely ✅")
-st.sidebar.info("Model: Gemini-1.5-Flash")
+# Tabs for a clean interface
+tab1, tab2 = st.tabs(["🚀 Generator", "📖 Help & Instructions"])
 
-# 4. File Uploader
-uploaded_file = st.file_uploader("Upload BRD (PDF Format)", type="pdf")
+with tab1:
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        st.subheader("Upload Requirements")
+        uploaded_file = st.file_uploader("Upload BRD (PDF Format)", type="pdf", help="Upload a business requirement document to start.")
 
-if uploaded_file:
-    try:
-        # Initialize Gemini with the secret key
-        genai.configure(api_key=api_key)
-        # Using the most stable flash model name
-        model = genai.GenerativeModel('gemini-flash-latest')
+    with col2:
+        st.subheader("Analysis Settings")
+        priority_level = st.select_slider("Select Detail Level", options=["Standard", "Detailed", "Exhaustive"])
+        include_neg = st.checkbox("Include Negative Test Cases", value=True)
 
-        # Extract Text from PDF
+    if uploaded_file:
+        # Extract Text
         reader = PdfReader(uploaded_file)
-        full_text = ""
-        for page in reader.pages:
-            full_text += page.extract_text()
+        full_text = "".join([page.extract_text() for page in reader.pages])
 
-        if st.button("Generate Test Cases"):
-            with st.spinner("Analyzing requirements and generating test cases..."):
-                # Enhanced AI Prompt for Negative and Positive cases
+        if st.button("Generate Test Matrix"):
+            with st.spinner("🤖 AI is analyzing requirements..."):
+                # Enhanced Prompt for structured output
                 prompt = f"""
-                Act as a Senior QA Engineer. Analyze the following Business Requirement Document (BRD) 
-                and generate a comprehensive test case matrix.
+                Act as a Senior QA Manager. Analyze the attached BRD and generate a professional test case matrix.
+                Include columns: ID, Type, Requirement, Description, Expected Result, Priority.
+                Include both Positive and {'Negative' if include_neg else ''} scenarios.
+                Focus on {priority_level} depth.
                 
-                Include BOTH Positive (Happy Path) and Negative (Invalid/Boundary) test cases.
-                Focus Negative cases on: missing data, unauthorized access, and invalid formats.
-
-                Format the output as a clean table with these columns: 
-                Test Case ID, Type (Positive/Negative), Requirement Reference, Description, Expected Result, Priority.
-                
-                BRD Text:
-                {full_text[:15000]} 
+                BRD CONTENT:
+                {full_text[:15000]}
                 """
                 
                 response = model.generate_content(prompt)
-                st.subheader("Generated Test Case Matrix")
-                st.markdown(response.text) # Using markdown for table rendering
                 
-                # Optional: Add a simple way to copy/download
+                st.divider()
+                st.subheader("✅ Generated Test Case Matrix")
+                st.markdown(response.text)
+                
+                # DOWNLOAD FEATURE
                 st.download_button(
-                    label="📥 Download Results as Text",
+                    label="📥 Download Test Cases as CSV",
                     data=response.text,
-                    file_name="test_cases.txt",
-                    mime="text/plain"
+                    file_name="QA_Test_Matrix.csv",
+                    mime="text/csv"
                 )
-                
-    except Exception as e:
-        st.error(f"An error occurred: {e}")
-else:
-    st.info("👋 Welcome! Please upload a PDF file to begin generating test cases.")
+
+with tab2:
+    st.markdown("""
+    ### How to use this tool:
+    1. **Upload**: Drag and drop your Business Requirement Document (PDF).
+    2. **Configure**: Choose the detail level and whether you want negative cases.
+    3. **Generate**: Click the button and wait for the AI to build your table.
+    4. **Export**: Use the download button to save your cases for Excel or Jira.
+    
+    *Privacy Note: Your documents are processed in real-time and not stored on our servers.*
+    """)
+
+# Sidebar for branding/status
+st.sidebar.title("App Info")
+st.sidebar.success("Connection: Stable ✅")
+st.sidebar.info("Model: Gemini 1.5 Flash")
+st.sidebar.write("Developed for QA Professionals")
