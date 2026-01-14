@@ -2,80 +2,95 @@ import streamlit as st
 import google.generativeai as genai
 from PyPDF2 import PdfReader
 import pandas as pd
-import time
+import io
 
-# 1. PAGE SETUP
-st.set_page_config(page_title="TestcaseCraft Pro", layout="wide", page_icon="🧪")
+# 1. PAGE CONFIGURATION & THEME
+st.set_page_config(
+    page_title="TestcaseCraft Pro",
+    page_icon="🧪",
+    layout="wide"
+)
 
-# 2. ADVANCED CSS (Glassmorphism & Professional Styling)
+# Professional CSS Styling
 st.markdown("""
     <style>
-    .stApp { background: #fdfdfd; }
-    .main-title { font-size: 3.5rem; font-weight: 800; color: #1E3A8A; text-align: center; padding-top: 2rem; }
-    .stButton>button { width: 100%; border-radius: 20px; border: none; background: linear-gradient(90deg, #1E3A8A 0%, #3B82F6 100%); color: white; transition: 0.3s; }
-    .stButton>button:hover { transform: scale(1.02); }
+    .main-header { font-size: 3rem; font-weight: 800; color: #1E3A8A; text-align: center; }
+    .stButton>button { width: 100%; border-radius: 20px; background: linear-gradient(90deg, #1E3A8A 0%, #3B82F6 100%); color: white; border: none; }
+    .stDataFrame { border: 1px solid #e6e9ef; border-radius: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. SECURE API LOADING
+# 2. SECURE API INITIALIZATION
 if "GEMINI_API_KEY" in st.secrets:
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    model = genai.GenerativeModel('gemini-flash-latest')
+    api_key = st.secrets["GEMINI_API_KEY"]
+    genai.configure(api_key=api_key)
+    # Configure safety settings to prevent unnecessary blocks
+    safety_settings = [
+        {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
+    ]
+    model = genai.GenerativeModel('gemini-1.5-flash', safety_settings=safety_settings)
 else:
-    st.error("Secrets missing: GEMINI_API_KEY")
+    st.error("⚠️ GEMINI_API_KEY not found in Secrets. Please add it to Streamlit Cloud settings.")
     st.stop()
 
-# 4. SIDEBAR BRANDING
+# 3. UI LAYOUT
+st.markdown('<p class="main-header">TestcaseCraft Pro</p>', unsafe_allow_html=True)
+
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/2092/2092215.png", width=80)
     st.title("Settings")
-    detail_level = st.radio("Test Granularity", ["High-Level", "Detailed", "Technical"])
-    include_negative = st.toggle("Negative Scenarios", value=True)
-    st.divider()
-    st.info("Status: Engine Online ✅")
+    detail_level = st.radio("Granularity", ["High-Level", "Detailed"])
+    include_neg = st.toggle("Negative Scenarios", value=True)
+    st.info("Engine: Gemini 1.5 Flash ✅")
 
-# 5. MAIN CONTENT
-st.markdown('<p class="main-title">TestcaseCraft Pro</p>', unsafe_allow_html=True)
-
-# Advanced Metrics Row
-m1, m2, m3 = st.columns(3)
-m1.metric("Model", "Gemini 1.5 Flash")
-m2.metric("Speed", "Instant")
-m3.metric("Type", "QA Expert")
-
-uploaded_file = st.file_uploader("", type="pdf")
+uploaded_file = st.file_uploader("Upload Business Requirement Document (PDF)", type="pdf")
 
 if uploaded_file:
-    # PDF Processing
     reader = PdfReader(uploaded_file)
     text = "".join([p.extract_text() for p in reader.pages])
-    
-    # Progress Container
-    if st.button("🚀 Generate Professional Matrix"):
-        with st.status("Analyzing Document...", expanded=True) as status:
-            st.write("Reading PDF content...")
-            time.sleep(1)
-            st.write("Identifying functional requirements...")
-            time.sleep(1)
-            st.write("Generating positive and negative paths...")
+
+    if st.button("🚀 Generate Structured Test Matrix"):
+        with st.status("Analyzing and Formatting Table...") as status:
+            prompt = f"""
+            Act as a Senior QA Lead. Analyze this BRD and generate a professional test case matrix.
+            OUTPUT ONLY A MARKDOWN TABLE. No conversational text.
             
-            prompt = f"Act as a Senior QA Manager. Analyze this BRD and generate a test matrix in CSV format (ID, Type, Desc, Expected, Priority). Detail: {detail_level}. Negative cases: {include_negative}. BRD: {text[:10000]}"
-            response = model.generate_content(prompt)
-            status.update(label="Analysis Complete!", state="complete", expanded=False)
+            Columns: ID, Type (Positive/Negative), Requirement, Description, Expected Result, Priority.
+            Detail Level: {detail_level}. Include Negative Scenarios: {include_neg}.
+            
+            BRD Content: {text[:10000]}
+            """
+            
+            try:
+                response = model.generate_content(prompt)
+                
+                # --- SAFETY CHECK: Prevents ValueError ---
+                if not response.candidates or not response.candidates[0].content.parts:
+                    status.update(label="Generation Blocked", state="error")
+                    st.error("⚠️ The AI response was blocked by safety filters. Try a different document or simplify the prompt.")
+                    if response.prompt_feedback:
+                        st.warning(f"Reason: {response.prompt_feedback}")
+                    st.stop()
+                
+                status.update(label="Table Generated!", state="complete", expanded=False)
+                
+                # 4. RESULTS DISPLAY
+                st.subheader("📊 Final Test Case Matrix")
+                # Using st.markdown to render the AI's markdown table cleanly
+                st.markdown(response.text)
+                
+                # 5. EXPORT FEATURE
+                st.download_button(
+                    label="📥 Download Matrix (CSV)",
+                    data=response.text,
+                    file_name="QA_Test_Matrix.csv",
+                    mime="text/csv"
+                )
+                
+            except Exception as e:
+                st.error(f"An error occurred: {e}")
 
-        # 6. RESULTS SECTION
-        st.subheader("📊 Requirement Coverage Matrix")
-        
-        # Display as a clean table (AI needs to output markdown table for this to work best)
-        st.markdown(response.text)
-        
-        # Download Action
-        st.download_button(
-            label="📥 Export to CSV / Excel",
-            data=response.text,
-            file_name="QA_Matrix_Pro.csv",
-            mime="text/csv"
-        )
-
-
-
+else:
+    st.info("👋 Welcome! Upload a PDF to start generating professional test matrices.")
