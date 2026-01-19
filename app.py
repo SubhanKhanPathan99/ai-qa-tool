@@ -6,16 +6,16 @@ import io
 
 # 1. FORCED PAGE CONFIGURATION
 st.set_page_config(
-    page_title="TestCaseCraft Pro | Enterprise QA",
+    page_title="TestcaseCraft Pro | Enterprise QA",
     page_icon="🧪",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded" 
 )
 
 # 2. ADVANCED CSS: COLOR #27F5C2 & ALIGNMENT ENGINE
 st.markdown("""
     <style>
-    /* HIDE STREAMLIT DEVELOPER OVERLAYS */
+    /* HIDE DEVELOPER OVERLAYS */
     header {visibility: hidden;}
     footer {visibility: hidden;}
     .stAppDeployButton {display: none;}
@@ -24,9 +24,7 @@ st.markdown("""
     button[data-testid="manage-app-button"] {display: none !important;}
 
     /* THEME COLOR #27F5C2 */
-    .stApp {
-        background-color: #27F5C2;
-    }
+    .stApp { background-color: #27F5C2; }
 
     /* REMOVE ALL TOP GAPS */
     .block-container {
@@ -42,7 +40,6 @@ st.markdown("""
         border-radius: 20px;
         padding: 30px;
         border: 1px solid rgba(0, 0, 0, 0.05);
-        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
     }
     
     .hero-title {
@@ -53,7 +50,7 @@ st.markdown("""
         margin-bottom: 0px;
     }
 
-    /* PERFECTLY ALIGNED BOTTOM BAR */
+    /* THE FINAL ALIGNED FOOTER (FIXED) */
     .footer-container {
         position: fixed;
         bottom: 0;
@@ -75,10 +72,7 @@ st.markdown("""
         font-size: 1rem;
     }
 
-    .footer-socials {
-        display: flex;
-        gap: 15px;
-    }
+    .footer-socials { display: flex; gap: 15px; }
 
     .social-link {
         padding: 10px 24px;
@@ -88,7 +82,6 @@ st.markdown("""
         font-weight: bold;
         font-size: 14px;
         transition: transform 0.2s ease;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
     }
 
     .social-link:hover { transform: scale(1.05); }
@@ -100,16 +93,23 @@ st.markdown("""
 # 3. SECURE API INITIALIZATION
 if "GEMINI_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    model = genai.GenerativeModel('gemini-flash-latest')
+    model = genai.GenerativeModel('gemini-1.5-flash-latest')
 else:
     st.error("API Key Missing in Streamlit Secrets.")
     st.stop()
 
-# 4. MAIN CONTENT
+# 4. SIDEBAR - CONTROL PANEL (RESTORED)
+with st.sidebar:
+    st.title("Control Panel")
+    st.divider()
+    st.success("System: Ready ✅")
+    st.info("Choose your analysis settings below or in the main window.")
+
+# 5. MAIN CONTENT
 st.markdown('<h1 class="hero-title">TestcaseCraft Pro</h1>', unsafe_allow_html=True)
 st.markdown("<p style='text-align:center; color:#1e293b; font-weight:600; font-size:1.1rem;'>Professional AI Engine for QA Requirement Analysis</p>", unsafe_allow_html=True)
 
-# 5. CACHED GENERATION
+# 6. CACHED GENERATION
 @st.cache_data(show_spinner=False, ttl=3600)
 def generate_cached_matrix(pdf_text, detail, framework, neg, edge, focus):
     prompt = f"QA Lead: Generate a markdown matrix for this BRD. Style: {framework}. Focus: {focus}. Depth: {detail}. Include Negative: {neg}. Edge: {edge}. Content: {pdf_text[:12000]}"
@@ -118,7 +118,7 @@ def generate_cached_matrix(pdf_text, detail, framework, neg, edge, focus):
     except Exception as e:
         return f"ERROR: {str(e)}"
 
-# 6. WORKSPACE
+# 7. WORKSPACE
 uploaded_file = st.file_uploader("Step 1: Upload BRD (PDF Format)", type="pdf")
 
 if uploaded_file:
@@ -133,7 +133,7 @@ if uploaded_file:
                                         ["UI/UX", "Security", "API/Backend", "Performance", "Database"], 
                                         default=["UI/UX"])
         test_framework = st.selectbox("📖 Output Format (BDD/Manual)", 
-                                      ["Standard Manual", "BDD (Cucumber/Gherkin)", "PyTest/Robot Framework"])
+                                      ["Standard Manual", "BDD (Cucumber/Gherkin)", "PyTest Framework"])
         detail_level = st.select_slider("🔍 Analysis Depth", options=["Standard", "Detailed", "Exhaustive"])
 
     with col2:
@@ -141,33 +141,31 @@ if uploaded_file:
         include_edge = st.toggle("⚡ Include Edge Case Analysis", value=True)
         st.info("💡 BDD format will generate 'Given-When-Then' scenarios.")
 
+    # FIX: THE PLACEHOLDER THAT REMOVES THE EMPTY BOX
+    placeholder = st.empty()
+    
     if st.button("🚀 Analyze and Generate Matrix"):
-        # We wrap the AI call in a status to keep the UI clean
-        with st.status("AI Analysis in Progress...") as status:
-            response = generate_cached_matrix(text, detail_level, test_framework, include_neg, include_edge, priority_focus)
-            if "ERROR" in str(response):
-                status.update(label="System Error", state="error")
-                st.error("⚠️ AI Quota Reached or System Error. Please wait 60 seconds.")
-                st.stop()
-            else:
-                # BY CLEARING THE STATUS, WE REMOVE THE EMPTY BOX
-                status.update(label="Analysis Complete!", state="complete", expanded=False)
-
-        # RESULTS AREA (Directly follows the button once complete)
-        st.markdown("---")
-        st.markdown("### 📊 Generated Test Matrix")
-        st.markdown(response.text)
+        # We put the status inside the placeholder
+        with placeholder.container():
+            with st.status("AI Analysis in Progress...") as status:
+                response = generate_cached_matrix(text, detail_level, test_framework, include_neg, include_edge, priority_focus)
+                if "ERROR" in str(response):
+                    st.error("⚠️ System Error or Quota Reached.")
+                    st.stop()
+                status.update(label="Analysis Complete!", state="complete")
         
-        st.download_button(
-            label="📥 Export Matrix to CSV",
-            data=response.text,
-            file_name="QA_Matrix.csv",
-            mime="text/csv"
-        )
+        # ONCE DONE, WE CLEAR THE PLACEHOLDER ENTIRELY
+        placeholder.empty()
+
+        # NOW SHOW RESULTS
+        st.markdown("---")
+        st.subheader("📊 Generated Test Matrix")
+        st.markdown(response.text)
+        st.download_button("📥 Export Matrix to CSV", response.text, "QA_Matrix.csv", "text/csv")
 else:
     st.info("👋 Welcome! Please upload your PDF document to activate the analysis engine.")
 
-# 7. THE CORRECTLY ALIGNED FOOTER BAR
+# 8. THE CORRECTLY ALIGNED FOOTER BAR
 st.markdown(
     f"""
     <div class="footer-container">
