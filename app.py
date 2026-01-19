@@ -1,81 +1,58 @@
 import streamlit as st
 from PyPDF2 import PdfReader
 from google import genai
-import google.api_core.exceptions
 import time
 
 # =========================================================
-# 1. PAGE CONFIG
+# PAGE CONFIG
 # =========================================================
 st.set_page_config(
-    page_title="TestcaseCraft Pro | Enterprise QA",
+    page_title="TestcaseCraft Pro | QA Automation",
     page_icon="🧪",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="wide"
 )
 
 # =========================================================
-# 2. CSS (UNCHANGED)
-# =========================================================
-st.markdown("""
-<style>
-header, footer, #MainMenu {visibility: hidden;}
-.stApp { background-color: #27F5C2; }
-.block-container { margin-top: -4rem; max-width: 95%; }
-.hero-title { font-size: 3.5rem; font-weight: 900; text-align: center; }
-.footer-container {
-    position: fixed; bottom: 0; width: 100%;
-    background: rgba(255,255,255,0.9);
-    display: flex; justify-content: space-between;
-    padding: 12px 40px;
-}
-.social-link { padding: 10px 24px; color: white; font-weight: bold; }
-.li-color { background:#0077b5; }
-.pf-color { background:#333; }
-</style>
-""", unsafe_allow_html=True)
-
-# =========================================================
-# 3. GEMINI CLIENT (NEW SDK – FIX)
+# API KEY CHECK
 # =========================================================
 if "GEMINI_API_KEY" not in st.secrets:
     st.error("❌ GEMINI_API_KEY missing in Streamlit secrets")
     st.stop()
 
+# =========================================================
+# GEMINI CLIENT (NEW SDK - REQUIRED)
+# =========================================================
 client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
-MODEL_NAME = "gemini-1.5-flash"  # ✅ WORKING
+MODEL_NAME = "gemini-1.5-flash"  # ✅ supported model
 
 # =========================================================
-# 4. SIDEBAR
+# UI HEADER
 # =========================================================
-with st.sidebar:
-    st.title("Control Panel")
-    st.success("Account Status: Tier 1 ✅")
+st.title("🧪 TestcaseCraft Pro")
+st.caption("AI-powered QA Test Case Generator from BRD PDFs")
 
 # =========================================================
-# 5. HEADER
-# =========================================================
-st.markdown('<h1 class="hero-title">TestcaseCraft Pro</h1>', unsafe_allow_html=True)
-st.markdown(
-    "<p style='text-align:center;font-weight:600;'>Professional AI Engine for QA Requirement Analysis</p>",
-    unsafe_allow_html=True
-)
-
-# =========================================================
-# 6. CACHED GENERATION (NEW CALL STYLE)
+# CORE AI FUNCTION
 # =========================================================
 @st.cache_data(show_spinner=False, ttl=3600)
-def generate_cached_matrix(pdf_text, detail, framework, neg, edge, focus):
+def generate_test_matrix(pdf_text, depth, framework, neg, edge):
 
     prompt = f"""
 You are a Senior QA Lead.
 
-Generate a professional QA test case matrix in MARKDOWN.
+Generate a PROFESSIONAL QA TEST CASE MATRIX in MARKDOWN format.
 
+Rules:
+- Use tables
+- Clear Test Case ID
+- Preconditions
+- Steps
+- Expected Result
+
+Configuration:
 Framework: {framework}
-Depth: {detail}
-Priority Areas: {', '.join(focus)}
+Depth: {depth}
 Include Negative Cases: {neg}
 Include Edge Cases: {edge}
 
@@ -91,84 +68,67 @@ BRD CONTENT:
             )
             return response.text
 
-        except google.api_core.exceptions.ResourceExhausted:
-            if attempt < 2:
-                time.sleep(5)
-                continue
-            return "QUOTA_EXCEEDED"
+        except Exception:
+            time.sleep(3)
 
-        except Exception as e:
-            return f"ERROR: {str(e)}"
+    return "❌ Failed to generate test cases. Please retry."
 
 # =========================================================
-# 7. WORKSPACE
+# FILE UPLOAD
 # =========================================================
-uploaded_file = st.file_uploader("Step 1: Upload BRD (PDF)", type="pdf")
+uploaded_file = st.file_uploader("📄 Upload BRD PDF", type="pdf")
 
 if uploaded_file:
     reader = PdfReader(uploaded_file)
-    text = "".join([p.extract_text() or "" for p in reader.pages])
+    pdf_text = "".join([page.extract_text() or "" for page in reader.pages])
 
-    st.markdown("### Step 2: Configure Your Test Strategy")
+    st.subheader("⚙️ Test Strategy Configuration")
 
     col1, col2 = st.columns(2)
 
     with col1:
-        priority_focus = st.multiselect(
-            "🎯 Priority Focus Areas",
-            ["UI/UX", "Security", "API/Backend", "Performance"],
-            default=["UI/UX"]
-        )
-        test_framework = st.selectbox(
-            "📖 Output Format",
+        framework = st.selectbox(
+            "Output Format",
             ["Standard Manual", "BDD (Cucumber/Gherkin)"]
         )
-        detail_level = st.select_slider(
-            "🔍 Analysis Depth",
+        depth = st.select_slider(
+            "Analysis Depth",
             ["Standard", "Detailed", "Exhaustive"]
         )
 
     with col2:
-        include_neg = st.toggle("🧪 Include Negative Cases", True)
-        include_edge = st.toggle("⚡ Include Edge Analysis", True)
+        neg = st.toggle("Include Negative Test Cases", True)
+        edge = st.toggle("Include Edge Cases", True)
 
-    if st.button("🚀 Analyze and Generate Matrix"):
-        with st.status("AI Analysis in Progress..."):
-            response = generate_cached_matrix(
-                text, detail_level, test_framework,
-                include_neg, include_edge, priority_focus
+    if st.button("🚀 Generate Test Matrix"):
+        with st.status("Analyzing BRD with Gemini AI..."):
+            result = generate_test_matrix(
+                pdf_text, depth, framework, neg, edge
             )
 
-            if response == "QUOTA_EXCEEDED":
-                st.error("⚠️ Quota limit reached. Please wait.")
-                st.stop()
-
-            if response.startswith("ERROR"):
-                st.error(response)
-                st.stop()
-
         st.markdown("---")
-        st.subheader("📊 Generated Test Matrix")
-        st.markdown(response)
+        st.subheader("📊 Generated Test Case Matrix")
+        st.markdown(result)
 
         st.download_button(
-            "📥 Export Matrix",
-            response,
-            "QA_Matrix.md",
-            "text/markdown"
+            "📥 Download as Markdown",
+            result,
+            file_name="QA_Test_Matrix.md",
+            mime="text/markdown"
         )
+
 else:
-    st.info("👋 Upload a BRD PDF to start.")
+    st.info("👆 Upload a BRD PDF to begin analysis.")
 
 # =========================================================
-# 8. FOOTER
+# FOOTER
 # =========================================================
-st.markdown("""
-<div class="footer-container">
-    <div>© 2026 | Subhan Khan Pathan</div>
-    <div>
-        <a class="social-link li-color" href="https://www.linkedin.com/in/pathan-subhan-khan-256547147/">LinkedIn</a>
-        <a class="social-link pf-color" href="https://subhankhanpathan99.github.io/">Portfolio</a>
-    </div>
-</div>
-""", unsafe_allow_html=True)
+st.markdown(
+    """
+    <hr>
+    <p style="text-align:center;font-weight:600;">
+        © 2026 | TestcaseCraft Pro
+    </p>
+    """,
+    unsafe_allow_html=True
+)
