@@ -9,10 +9,10 @@ st.set_page_config(
     page_title="TestCaseCraft Pro | Enterprise QA",
     page_icon="🧪",
     layout="wide",
-    initial_sidebar_state="collapsed" # We move options to main page, so sidebar can be closed
+    initial_sidebar_state="collapsed"
 )
 
-# 2. ADVANCED CSS: #27F5C2 THEME & ALIGNMENT ENGINE
+# 2. ADVANCED CSS: COLOR #27F5C2 & ALIGNMENT ENGINE
 st.markdown("""
     <style>
     /* HIDE STREAMLIT DEVELOPER OVERLAYS */
@@ -53,20 +53,20 @@ st.markdown("""
         margin-bottom: 0px;
     }
 
-    /* THE FINAL ALIGNED FOOTER */
+    /* PERFECTLY ALIGNED BOTTOM BAR */
     .footer-container {
         position: fixed;
         bottom: 0;
         left: 0;
         width: 100%;
-        background: rgba(255, 255, 255, 0.8);
+        background: rgba(255, 255, 255, 0.9);
         backdrop-filter: blur(10px);
         display: flex;
         justify-content: space-between;
         align-items: center;
         padding: 12px 40px;
         z-index: 9999;
-        border-top: 1px solid rgba(0,0,0,0.05);
+        border-top: 1px solid rgba(0,0,0,0.1);
     }
 
     .footer-copyright {
@@ -88,6 +88,7 @@ st.markdown("""
         font-weight: bold;
         font-size: 14px;
         transition: transform 0.2s ease;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
     }
 
     .social-link:hover { transform: scale(1.05); }
@@ -118,14 +119,12 @@ def generate_cached_matrix(pdf_text, detail, framework, neg, edge, focus):
         return f"ERROR: {str(e)}"
 
 # 6. WORKSPACE
-# THE UPLOAD SECTION
 uploaded_file = st.file_uploader("Step 1: Upload BRD (PDF Format)", type="pdf")
 
 if uploaded_file:
     reader = PdfReader(uploaded_file)
     text = "".join([p.extract_text() for p in reader.pages])
 
-    # NEW: OPTIONS SECTION BELOW UPLOAD
     st.markdown("### Step 2: Configure Your Test Strategy")
     col1, col2 = st.columns(2)
     
@@ -142,23 +141,33 @@ if uploaded_file:
         include_edge = st.toggle("⚡ Include Edge Case Analysis", value=True)
         st.info("💡 BDD format will generate 'Given-When-Then' scenarios.")
 
-    # GENERATE BUTTON
     if st.button("🚀 Analyze and Generate Matrix"):
-        with st.status("AI Analysis in Progress...", expanded=True) as status:
+        # We wrap the AI call in a status to keep the UI clean
+        with st.status("AI Analysis in Progress...") as status:
             response = generate_cached_matrix(text, detail_level, test_framework, include_neg, include_edge, priority_focus)
             if "ERROR" in str(response):
-                st.error("⚠️ System Error or Quota Reached.")
+                status.update(label="System Error", state="error")
+                st.error("⚠️ AI Quota Reached or System Error. Please wait 60 seconds.")
                 st.stop()
-            status.update(label="Analysis Complete!", state="complete", expanded=False)
+            else:
+                # BY CLEARING THE STATUS, WE REMOVE THE EMPTY BOX
+                status.update(label="Analysis Complete!", state="complete", expanded=False)
 
+        # RESULTS AREA (Directly follows the button once complete)
         st.markdown("---")
-        st.subheader("📊 Generated Test Matrix")
+        st.markdown("### 📊 Generated Test Matrix")
         st.markdown(response.text)
-        st.download_button("📥 Export Matrix to CSV", response.text, "QA_Matrix.csv", "text/csv")
+        
+        st.download_button(
+            label="📥 Export Matrix to CSV",
+            data=response.text,
+            file_name="QA_Matrix.csv",
+            mime="text/csv"
+        )
 else:
-    st.info("👋 Welcome! Please upload your PDF document to see analysis options.")
+    st.info("👋 Welcome! Please upload your PDF document to activate the analysis engine.")
 
-# 7. THE ALIGNED FOOTER BAR
+# 7. THE CORRECTLY ALIGNED FOOTER BAR
 st.markdown(
     f"""
     <div class="footer-container">
