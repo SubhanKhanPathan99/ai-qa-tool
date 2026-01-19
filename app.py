@@ -9,10 +9,10 @@ st.set_page_config(
     page_title="TestcaseCraft Pro | Enterprise QA",
     page_icon="🧪",
     layout="wide",
-    initial_sidebar_state="expanded" # FORCES THE LEFT BAR TO STAY OPEN
+    initial_sidebar_state="collapsed" # We move options to main page, so sidebar can be closed
 )
 
-# 2. ADVANCED CSS: COLOR #27F5C2 & ALIGNMENT ENGINE
+# 2. ADVANCED CSS: #27F5C2 THEME & ALIGNMENT ENGINE
 st.markdown("""
     <style>
     /* HIDE STREAMLIT DEVELOPER OVERLAYS */
@@ -35,12 +35,6 @@ st.markdown("""
         max-width: 95%;
     }
 
-    /* SIDEBAR (CONTROL PANEL) STYLING */
-    [data-testid="stSidebar"] {
-        background-color: white !important;
-        border-right: 1px solid rgba(0,0,0,0.1);
-    }
-
     /* GLASSMORPHISM MAIN CARDS */
     div[data-testid="stVerticalBlock"] > div:has(div.stMarkdown) {
         background: rgba(255, 255, 255, 0.95);
@@ -59,7 +53,7 @@ st.markdown("""
         margin-bottom: 0px;
     }
 
-    /* THE FINAL ALIGNED FOOTER (FLEXBOX ENGINE) */
+    /* THE FINAL ALIGNED FOOTER */
     .footer-container {
         position: fixed;
         bottom: 0;
@@ -68,7 +62,7 @@ st.markdown("""
         background: rgba(255, 255, 255, 0.8);
         backdrop-filter: blur(10px);
         display: flex;
-        justify-content: space-between; /* MAGNET: Left text, Right buttons */
+        justify-content: space-between;
         align-items: center;
         padding: 12px 40px;
         z-index: 9999;
@@ -83,7 +77,7 @@ st.markdown("""
 
     .footer-socials {
         display: flex;
-        gap: 15px; /* Perfect spacing between social buttons */
+        gap: 15px;
     }
 
     .social-link {
@@ -96,10 +90,7 @@ st.markdown("""
         transition: transform 0.2s ease;
     }
 
-    .social-link:hover {
-        transform: scale(1.05);
-    }
-
+    .social-link:hover { transform: scale(1.05); }
     .li-color { background-color: #0077b5; }
     .pf-color { background-color: #333333; }
     </style>
@@ -113,31 +104,11 @@ else:
     st.error("API Key Missing in Streamlit Secrets.")
     st.stop()
 
-# 4. SIDEBAR - CONTROL PANEL (ALWAYS VISIBLE)
-# We use st.sidebar explicitly to ensure it loads in the left bar
-with st.sidebar:
-    st.title("Control Panel")
-    st.divider()
-    
-    st.subheader("🛠️ Core Settings")
-    detail_level = st.select_slider("Analysis Depth", options=["Standard", "Detailed", "Exhaustive"])
-    
-    st.subheader("🎯 Test Strategy")
-    test_framework = st.selectbox("Preferred Framework", ["Standard Manual", "Cucumber/Gherkin", "PyTest/Robot"])
-    priority_focus = st.multiselect("Priority Focus", ["Security", "UI/UX", "API", "Performance"], default=["UI/UX"])
-    
-    st.subheader("🧪 Scenarios")
-    include_neg = st.toggle("Negative Scenarios", value=True)
-    include_edge = st.toggle("Edge Case Analysis", value=True)
-    
-    st.divider()
-    st.success("System: Ready ✅")
-
-# 5. MAIN CONTENT
+# 4. MAIN CONTENT
 st.markdown('<h1 class="hero-title">TestcaseCraft Pro</h1>', unsafe_allow_html=True)
 st.markdown("<p style='text-align:center; color:#1e293b; font-weight:600; font-size:1.1rem;'>Professional AI Engine for QA Requirement Analysis</p>", unsafe_allow_html=True)
 
-# 6. CACHED GENERATION (Fixes Quota Error)
+# 5. CACHED GENERATION
 @st.cache_data(show_spinner=False, ttl=3600)
 def generate_cached_matrix(pdf_text, detail, framework, neg, edge, focus):
     prompt = f"QA Lead: Generate a markdown matrix for this BRD. Style: {framework}. Focus: {focus}. Depth: {detail}. Include Negative: {neg}. Edge: {edge}. Content: {pdf_text[:12000]}"
@@ -146,13 +117,32 @@ def generate_cached_matrix(pdf_text, detail, framework, neg, edge, focus):
     except Exception as e:
         return f"ERROR: {str(e)}"
 
-# 7. WORKSPACE
-uploaded_file = st.file_uploader("Upload BRD (PDF Format)", type="pdf")
+# 6. WORKSPACE
+# THE UPLOAD SECTION
+uploaded_file = st.file_uploader("Step 1: Upload BRD (PDF Format)", type="pdf")
 
 if uploaded_file:
     reader = PdfReader(uploaded_file)
     text = "".join([p.extract_text() for p in reader.pages])
 
+    # NEW: OPTIONS SECTION BELOW UPLOAD
+    st.markdown("### Step 2: Configure Your Test Strategy")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        priority_focus = st.multiselect("🎯 Priority Focus Areas", 
+                                        ["UI/UX", "Security", "API/Backend", "Performance", "Database"], 
+                                        default=["UI/UX"])
+        test_framework = st.selectbox("📖 Output Format (BDD/Manual)", 
+                                      ["Standard Manual", "BDD (Cucumber/Gherkin)", "PyTest/Robot Framework"])
+        detail_level = st.select_slider("🔍 Analysis Depth", options=["Standard", "Detailed", "Exhaustive"])
+
+    with col2:
+        include_neg = st.toggle("🧪 Include Negative Test Cases", value=True)
+        include_edge = st.toggle("⚡ Include Edge Case Analysis", value=True)
+        st.info("💡 BDD format will generate 'Given-When-Then' scenarios.")
+
+    # GENERATE BUTTON
     if st.button("🚀 Analyze and Generate Matrix"):
         with st.status("AI Analysis in Progress...", expanded=True) as status:
             response = generate_cached_matrix(text, detail_level, test_framework, include_neg, include_edge, priority_focus)
@@ -161,13 +151,14 @@ if uploaded_file:
                 st.stop()
             status.update(label="Analysis Complete!", state="complete", expanded=False)
 
-        st.markdown("### 📊 Generated Test Matrix")
+        st.markdown("---")
+        st.subheader("📊 Generated Test Matrix")
         st.markdown(response.text)
         st.download_button("📥 Export Matrix to CSV", response.text, "QA_Matrix.csv", "text/csv")
 else:
-    st.info("👋 Welcome! Please upload your PDF document to activate the analysis engine.")
+    st.info("👋 Welcome! Please upload your PDF document to see analysis options.")
 
-# 8. THE CORRECTLY ALIGNED FOOTER BAR
+# 7. THE ALIGNED FOOTER BAR
 st.markdown(
     f"""
     <div class="footer-container">
