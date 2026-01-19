@@ -13,27 +13,23 @@ st.set_page_config(
 )
 
 # =========================================================
-# API KEY CHECK
+# API KEY
 # =========================================================
 if "GEMINI_API_KEY" not in st.secrets:
     st.error("❌ GEMINI_API_KEY missing in Streamlit secrets")
     st.stop()
 
-# =========================================================
-# GEMINI CLIENT (NEW SDK - REQUIRED)
-# =========================================================
 client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
-
-MODEL_NAME = "gemini-1.5-flash"  # ✅ supported model
+MODEL_NAME = "gemini-1.5-flash"
 
 # =========================================================
-# UI HEADER
+# UI
 # =========================================================
 st.title("🧪 TestcaseCraft Pro")
 st.caption("AI-powered QA Test Case Generator from BRD PDFs")
 
 # =========================================================
-# CORE AI FUNCTION
+# GEMINI CALL (FIXED RESPONSE PARSING)
 # =========================================================
 @st.cache_data(show_spinner=False, ttl=3600)
 def generate_test_matrix(pdf_text, depth, framework, neg, edge):
@@ -43,9 +39,9 @@ You are a Senior QA Lead.
 
 Generate a PROFESSIONAL QA TEST CASE MATRIX in MARKDOWN format.
 
-Rules:
+Requirements:
 - Use tables
-- Clear Test Case ID
+- Include Test Case ID
 - Preconditions
 - Steps
 - Expected Result
@@ -66,12 +62,14 @@ BRD CONTENT:
                 model=MODEL_NAME,
                 contents=prompt
             )
-            return response.text
 
-        except Exception:
+            # ✅ CORRECT WAY TO READ TEXT
+            return response.candidates[0].content.parts[0].text
+
+        except Exception as e:
             time.sleep(3)
 
-    return "❌ Failed to generate test cases. Please retry."
+    return None
 
 # =========================================================
 # FILE UPLOAD
@@ -108,14 +106,18 @@ if uploaded_file:
 
         st.markdown("---")
         st.subheader("📊 Generated Test Case Matrix")
-        st.markdown(result)
 
-        st.download_button(
-            "📥 Download as Markdown",
-            result,
-            file_name="QA_Test_Matrix.md",
-            mime="text/markdown"
-        )
+        if result:
+            st.markdown(result)
+
+            st.download_button(
+                "📥 Download as Markdown",
+                result,
+                file_name="QA_Test_Matrix.md",
+                mime="text/markdown"
+            )
+        else:
+            st.error("❌ Failed to generate test cases. Please retry.")
 
 else:
     st.info("👆 Upload a BRD PDF to begin analysis.")
@@ -124,11 +126,6 @@ else:
 # FOOTER
 # =========================================================
 st.markdown(
-    """
-    <hr>
-    <p style="text-align:center;font-weight:600;">
-        © 2026 | TestcaseCraft Pro
-    </p>
-    """,
+    "<hr><p style='text-align:center;font-weight:600;'>© 2026 | TestcaseCraft Pro</p>",
     unsafe_allow_html=True
 )
