@@ -20,7 +20,7 @@ if "GEMINI_API_KEY" not in st.secrets:
     st.stop()
 
 client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
-MODEL_NAME = "gemini-1.5-flash"
+MODEL_NAME = "gemini-flash-latest"
 
 # =========================================================
 # UI
