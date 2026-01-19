@@ -15,19 +15,34 @@ st.set_page_config(
 # 2. ADVANCED CSS: ENTERPRISE UI & GAP REMOVAL
 st.markdown("""
     <style>
-    /* HIDE TOP ICONS (Deploy, GitHub, Menu) */
+    /* HIDE TOP ICONS & MANAGE APP BUTTON */
     header {visibility: hidden;}
     footer {visibility: hidden;}
     .stAppDeployButton {display: none;}
+    #MainMenu {visibility: hidden;}
+    [data-testid="stStatusWidget"] {visibility: hidden;}
     
-    /* REMOVE TOP WHITESPACE & SIDEBAR GAPS */
+    /* HIDE 'MANAGE APP' BUTTON AT BOTTOM RIGHT */
+    button[data-testid="manage-app-button"] {
+        display: none !important;
+    }
+
+    /* REMOVE TOP WHITESPACE (ABOVE TITLE) */
     .block-container {
         padding-top: 0rem !important;
-        margin-top: -1.5rem !important;
+        margin-top: -3.5rem !important; /* Pulls title to the very top */
         max-width: 95%;
     }
+
+    /* FIX SIDEBAR GAPS (BETWEEN CONTROL PANEL & SETTINGS) */
     [data-testid="stSidebar"] > div:first-child {
-        padding-top: 0rem !important;
+        padding-top: 0.5rem !important;
+    }
+    .st-emotion-cache-16idsys p {
+        margin-bottom: -1rem !important; /* Reduces gap after labels */
+    }
+    [data-testid="stSidebar"] [data-testid="stVerticalBlock"] {
+        gap: 0.5rem !important; /* Tightens the vertical space in sidebar */
     }
 
     /* ANIMATED PROFESSIONAL BACKGROUND */
@@ -47,17 +62,30 @@ st.markdown("""
         background: rgba(255, 255, 255, 0.6);
         backdrop-filter: blur(10px);
         border-radius: 20px;
-        padding: 30px;
+        padding: 25px;
         border: 1px solid rgba(255, 255, 255, 0.3);
     }
     
     /* CUSTOM TITLE STYLING */
     .hero-title {
-        font-size: 3.5rem;
+        font-size: 3.2rem;
         font-weight: 900;
         color: #1e293b;
         text-align: center;
         margin-bottom: 0px;
+    }
+
+    /* FOOTER DISCLAIMER STYLING */
+    .footer {
+        position: fixed;
+        left: 0;
+        bottom: 0;
+        width: 100%;
+        background-color: transparent;
+        color: #64748b;
+        text-align: center;
+        font-size: 0.8rem;
+        padding: 10px;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -65,7 +93,6 @@ st.markdown("""
 # 3. SECURE API INITIALIZATION
 if "GEMINI_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    # Using the stable latest alias to avoid 'NotFound' errors
     model = genai.GenerativeModel('gemini-1.5-flash-latest')
 else:
     st.error("API Key Missing in Secrets Management.")
@@ -74,7 +101,7 @@ else:
 # 4. SIDEBAR - CLEAN CONTROL PANEL
 with st.sidebar:
     st.title("Control Panel")
-    st.divider()
+    # Reducing gap manually by avoiding extra dividers or markdown if not needed
     st.subheader("🛠️ Core Settings")
     detail_level = st.select_slider("Analysis Depth", options=["Standard", "Detailed", "Exhaustive"])
     
@@ -85,32 +112,23 @@ with st.sidebar:
     st.subheader("🧪 Scenarios")
     include_neg = st.toggle("Negative Scenarios", value=True)
     include_edge = st.toggle("Edge Case Analysis", value=True)
-    st.divider()
     st.success("System: Ready ✅")
 
 # 5. MAIN WEBSITE TITLE
 st.markdown('<h1 class="hero-title">TestcaseCraft Pro</h1>', unsafe_allow_html=True)
-st.markdown("<p style='text-align:center; color:#475569; font-size:1.1rem;'>Professional AI Engine for QA Requirement Analysis</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center; color:#475569; font-size:1rem; margin-bottom:1rem;'>Enterprise-Grade AI Engine for QA Requirement Analysis</p>", unsafe_allow_html=True)
 
-# 6. CACHED GENERATION (Fixes 429 Quota Error & Saves Quota)
+# 6. CACHED GENERATION
 @st.cache_data(show_spinner=False, ttl=3600)
 def generate_cached_matrix(pdf_text, detail, framework, neg, edge, focus):
-    """Stores results for 1 hour. Repeat clicks won't waste API quota."""
-    prompt = f"""
-    Act as a Senior QA Lead. Generate a professional test case matrix.
-    OUTPUT ONLY A MARKDOWN TABLE.
-    Style: {framework}. Focus: {focus}. Depth: {detail}.
-    Include Negative: {neg}. Include Edge: {edge}.
-    Columns: ID, Type, Requirement Ref, Description, Expected Result, Priority.
-    BRD CONTENT: {pdf_text[:12000]}
-    """
+    prompt = f"Act as a QA Lead. Generate a markdown table matrix for this BRD. Style: {framework}. Focus: {focus}. Depth: {detail}. Include Negative: {neg}. Edge: {edge}. Content: {pdf_text[:12000]}"
     try:
         return model.generate_content(prompt)
     except google.api_core.exceptions.ResourceExhausted:
         return "QUOTA_ERROR"
 
 # 7. MAIN WORKSPACE
-uploaded_file = st.file_uploader("Upload Business Requirement Document (PDF)", type="pdf")
+uploaded_file = st.file_uploader("Upload BRD (PDF)", type="pdf")
 
 if uploaded_file:
     reader = PdfReader(uploaded_file)
@@ -121,21 +139,20 @@ if uploaded_file:
             response = generate_cached_matrix(text, detail_level, test_framework, include_neg, include_edge, priority_focus)
             
             if response == "QUOTA_ERROR":
-                status.update(label="Quota Exceeded", state="error")
-                st.error("⚠️ Free Tier limit reached. Please wait 60 seconds and try again.")
+                st.error("⚠️ Quota Exceeded. Please wait 60 seconds.")
                 st.stop()
             
             status.update(label="Analysis Complete!", state="complete", expanded=False)
 
-        st.markdown("---")
-        st.subheader("📊 Generated Test Matrix")
+        st.markdown("### 📊 Generated Test Matrix")
         st.markdown(response.text)
-        
-        st.download_button(
-            label="📥 Export Matrix to CSV",
-            data=response.text,
-            file_name="QA_Matrix.csv",
-            mime="text/csv"
-        )
+        st.download_button("📥 Export Matrix to CSV", response.text, "QA_Matrix.csv", "text/csv")
+
 else:
     st.info("👋 Welcome! Please upload your PDF document to activate the analysis engine.")
+
+# 8. FOOTER DISCLAIMER
+st.markdown(
+    '<div class="footer">© 2026 TestcaseCraft Pro. All rights reserved. | Developed by Subhan Khan Pathan</div>', 
+    unsafe_allow_html=True
+)
