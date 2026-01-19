@@ -6,7 +6,7 @@ import time
 
 # 1. FORCED PAGE CONFIGURATION
 st.set_page_config(
-    page_title="TestcaseCraft Pro | Enterprise QA",
+    page_title="TestCaseCraft Pro | Enterprise QA",
     page_icon="🧪",
     layout="wide",
     initial_sidebar_state="expanded" 
@@ -79,7 +79,7 @@ st.markdown("""
 # 3. SECURE API INITIALIZATION
 if "GEMINI_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    model = genai.GenerativeModel('gemini-1.5-flash-latest')
+    model = genai.GenerativeModel('gemini-flash-latest')
 else:
     st.error("API Key Missing in Streamlit Secrets.")
     st.stop()
