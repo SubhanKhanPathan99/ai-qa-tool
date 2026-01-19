@@ -1,104 +1,170 @@
 import streamlit as st
+import google.generativeai as genai
 from PyPDF2 import PdfReader
-from google import genai
+import google.api_core.exceptions
 import time
 
+# 1. FORCED PAGE CONFIGURATION
 st.set_page_config(
-    page_title="TestcaseCraft Pro",
+    page_title="TestcaseCraft Pro | Enterprise QA",
     page_icon="🧪",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded" 
 )
 
-if "GEMINI_API_KEY" not in st.secrets:
-    st.error("❌ GEMINI_API_KEY missing in Streamlit secrets")
+# 2. ADVANCED CSS: COLOR #27F5C2 & UI FIXES
+st.markdown("""
+    <style>
+    header {visibility: hidden;}
+    footer {visibility: hidden;}
+    .stAppDeployButton {display: none;}
+    #MainMenu {visibility: hidden;}
+    [data-testid="stStatusWidget"] {display: none !important;}
+    button[data-testid="manage-app-button"] {display: none !important;}
+
+    .stApp { background-color: #27F5C2; }
+
+    .block-container {
+        padding-top: 0rem !important;
+        margin-top: -4rem !important; 
+        max-width: 95%;
+    }
+
+    div[data-testid="stVerticalBlock"] > div:has(div.stMarkdown) {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        padding: 30px;
+        border: 1px solid rgba(0, 0, 0, 0.05);
+    }
+    
+    .hero-title {
+        font-size: 3.5rem;
+        font-weight: 900;
+        color: #1e293b;
+        text-align: center;
+        margin-bottom: 0px;
+    }
+
+    .footer-container {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(10px);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 40px;
+        z-index: 9999;
+        border-top: 1px solid rgba(0,0,0,0.1);
+    }
+
+    .footer-copyright { color: #1e293b; font-weight: 700; font-size: 1rem; }
+    .footer-socials { display: flex; gap: 15px; }
+    .social-link {
+        padding: 10px 24px;
+        border-radius: 50px;
+        color: white !important;
+        text-decoration: none;
+        font-weight: bold;
+        font-size: 14px;
+    }
+    .li-color { background-color: #0077b5; }
+    .pf-color { background-color: #333333; }
+    </style>
+    """, unsafe_allow_html=True)
+
+# 3. SECURE API INITIALIZATION (CRITICAL FIX FOR 404)
+if "GEMINI_API_KEY" in st.secrets:
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+    # Using the most stable model name for versioned API calls
+    model = genai.GenerativeModel('gemini-flash-latest') 
+else:
+    st.error("API Key Missing in Streamlit Secrets.")
     st.stop()
 
-client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+# 4. SIDEBAR
+with st.sidebar:
+    st.title("Control Panel")
+    st.divider()
+    st.success("Account Status: Tier 1 ✅")
 
-# ✅ ONLY MODEL THAT WORKS EVERYWHERE
-MODEL_NAME = "models/gemini-1.0-pro"
+# 5. MAIN CONTENT
+st.markdown('<h1 class="hero-title">TestcaseCraft Pro</h1>', unsafe_allow_html=True)
+st.markdown("<p style='text-align:center; color:#1e293b; font-weight:600; font-size:1.1rem;'>Professional AI Engine for QA Requirement Analysis</p>", unsafe_allow_html=True)
 
-st.title("🧪 TestcaseCraft Pro")
-st.caption("AI-powered QA Test Case Generator from BRD PDFs")
-
+# 6. CACHED GENERATION WITH TIER 1 RETRY LOGIC
 @st.cache_data(show_spinner=False, ttl=3600)
-def generate_test_matrix(pdf_text, depth, framework, neg, edge):
+def generate_cached_matrix(pdf_text, detail, framework, neg, edge, focus):
+    prompt = f"QA Lead: Generate a markdown matrix for this BRD. Style: {framework}. Focus: {focus}. Depth: {detail}. Include Negative: {neg}. Edge: {edge}. Content: {pdf_text[:12000]}"
+    
+    for attempt in range(3):
+        try:
+            return model.generate_content(prompt)
+        except google.api_core.exceptions.ResourceExhausted:
+            if attempt < 2:
+                time.sleep(10) # Wait longer for Tier 1 cooldown
+                continue
+            return "QUOTA_EXCEEDED"
+        except Exception as e:
+            return f"ERROR: {str(e)}"
 
-    prompt = f"""
-You are a Senior QA Lead.
-
-Generate a PROFESSIONAL QA TEST CASE MATRIX in MARKDOWN format.
-
-Use a table with:
-- Test Case ID
-- Scenario
-- Preconditions
-- Steps
-- Expected Result
-
-Framework: {framework}
-Depth: {depth}
-Include Negative Cases: {neg}
-Include Edge Cases: {edge}
-
-BRD CONTENT:
-{pdf_text[:8000]}
-"""
-
-    try:
-        response = client.models.generate_content(
-            model=MODEL_NAME,
-            contents=prompt
-        )
-
-        if not response.candidates:
-            return "❌ No response candidates from Gemini."
-
-        parts = response.candidates[0].content.parts
-        if not parts:
-            return "❌ Empty Gemini response."
-
-        return parts[0].text
-
-    except Exception as e:
-        return f"❌ Gemini API error: {str(e)}"
-
-uploaded_file = st.file_uploader("📄 Upload BRD PDF", type="pdf")
+# 7. WORKSPACE
+uploaded_file = st.file_uploader("Step 1: Upload BRD (PDF)", type="pdf")
 
 if uploaded_file:
     reader = PdfReader(uploaded_file)
-    pdf_text = "".join([p.extract_text() or "" for p in reader.pages])
+    text = "".join([p.extract_text() for p in reader.pages])
 
-    framework = st.selectbox(
-        "Output Format",
-        ["Standard Manual", "BDD (Cucumber/Gherkin)"]
-    )
-    depth = st.select_slider(
-        "Analysis Depth",
-        ["Standard", "Detailed", "Exhaustive"]
-    )
+    st.markdown("### Step 2: Configure Your Test Strategy")
+    col1, col2 = st.columns(2)
+    with col1:
+        priority_focus = st.multiselect("🎯 Priority Focus Areas", ["UI/UX", "Security", "API/Backend", "Performance"], default=["UI/UX"])
+        test_framework = st.selectbox("📖 Output Format", ["Standard Manual", "BDD (Cucumber/Gherkin)"])
+        detail_level = st.select_slider("🔍 Analysis Depth", options=["Standard", "Detailed", "Exhaustive"])
+    with col2:
+        include_neg = st.toggle("🧪 Include Negative Cases", value=True)
+        include_edge = st.toggle("⚡ Include Edge Analysis", value=True)
 
-    neg = st.toggle("Include Negative Test Cases", True)
-    edge = st.toggle("Include Edge Cases", True)
-
-    if st.button("🚀 Generate Test Matrix"):
-        with st.status("Analyzing BRD with Gemini AI..."):
-            result = generate_test_matrix(
-                pdf_text, depth, framework, neg, edge
-            )
+    # PLACEHOLDER TO KILL EMPTY BOXES
+    status_placeholder = st.empty()
+    
+    if st.button("🚀 Analyze and Generate Matrix"):
+        with status_placeholder.container():
+            with st.status("AI Analysis in Progress...") as status:
+                response = generate_cached_matrix(text, detail_level, test_framework, include_neg, include_edge, priority_focus)
+                
+                if response == "QUOTA_EXCEEDED":
+                    st.error("⚠️ Minute limit reached. Please wait 60 seconds.")
+                    st.stop()
+                elif "ERROR" in str(response):
+                    st.error(f"⚠️ System Error: {response}")
+                    st.stop()
+                
+                status.update(label="Analysis Complete!", state="complete")
+        
+        # CLEAR STATUS WINDOW ENTIRELY
+        status_placeholder.empty()
 
         st.markdown("---")
-        st.subheader("📊 Generated Test Case Matrix")
-
-        if result.startswith("❌"):
-            st.error(result)
-        else:
-            st.markdown(result)
-            st.download_button(
-                "📥 Download Markdown",
-                result,
-                file_name="QA_Test_Matrix.md",
-                mime="text/markdown"
-            )
+        st.subheader("📊 Generated Test Matrix")
+        st.markdown(response.text)
+        st.download_button("📥 Export Matrix to CSV", response.text, "QA_Matrix.csv", "text/csv")
 else:
-    st.info("👆 Upload a BRD PDF to begin analysis.")
+    st.info("👋 Welcome! Please upload your PDF document to activate the analysis engine.")
+
+# 8. FOOTER
+st.markdown(
+    f"""
+    <div class="footer-container">
+        <div class="footer-copyright">© 2026 | Subhan Khan Pathan</div>
+        <div class="footer-socials">
+            <a href="https://www.linkedin.com/in/pathan-subhan-khan-256547147/" class="social-link li-color" target="_blank">LinkedIn</a>
+            <a href="https://subhankhanpathan99.github.io/" class="social-link pf-color" target="_blank">Portfolio</a>
+        </div>
+    </div>
+    """, 
+    unsafe_allow_html=True
+)
