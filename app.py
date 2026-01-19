@@ -4,25 +4,23 @@ from PyPDF2 import PdfReader
 import google.api_core.exceptions
 import io
 
-# 1. PAGE CONFIGURATION - RESTORING THE LEFT BAR
+# 1. PAGE CONFIGURATION - MANDATORY FOR SIDEBAR
 st.set_page_config(
     page_title="TestcaseCraft Pro | Enterprise QA",
     page_icon="🧪",
     layout="wide",
-    initial_sidebar_state="expanded" # FORCES SIDEBAR TO SHOW
+    initial_sidebar_state="expanded" # This FORCES the left bar to stay open
 )
 
-# 2. ADVANCED CSS: #27F5C2 THEME & ALIGNMENT FIXES
+# 2. ADVANCED CSS: COLOR #27F5C2 & ALIGNMENT FIXES
 st.markdown("""
     <style>
-    /* HIDE DEVELOPER TOOLS */
+    /* HIDE DEVELOPER TOOLS & MANAGE APP */
     header {visibility: hidden;}
     footer {visibility: hidden;}
     .stAppDeployButton {display: none;}
     #MainMenu {visibility: hidden;}
     [data-testid="stStatusWidget"] {display: none !important;}
-    
-    /* HIDE MANAGE APP BUTTON PERMANENTLY */
     button[data-testid="manage-app-button"] {display: none !important;}
     .st-emotion-cache-zq5wms {display: none !important;}
 
@@ -31,7 +29,7 @@ st.markdown("""
         background-color: #27F5C2;
     }
 
-    /* REMOVE TOP GAPS */
+    /* REMOVE GAPS ABOVE TITLE */
     .block-container {
         padding-top: 0rem !important;
         margin-top: -3.5rem !important; 
@@ -55,50 +53,49 @@ st.markdown("""
         margin-bottom: 0px;
     }
 
-    /* FIXED BOTTOM BAR FOR COPYRIGHT & BUTTONS */
-    .bottom-bar {
+    /* PERFECTLY ALIGNED BOTTOM BAR */
+    .fixed-footer {
         position: fixed;
         bottom: 0;
         left: 0;
         width: 100%;
-        padding: 15px 40px;
-        display: flex;
-        justify-content: space-between; /* Pushes Copyright left, Buttons right */
-        align-items: center;
-        background: rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.2);
         backdrop-filter: blur(5px);
+        display: flex;
+        justify-content: space-between; /* Pushes text left, buttons right */
+        align-items: center;
+        padding: 10px 40px;
         z-index: 9999;
     }
 
-    .copyright-text {
+    .footer-text {
         color: #1e293b;
         font-weight: 600;
         font-size: 0.95rem;
     }
 
-    .social-group {
+    .footer-buttons {
         display: flex;
         gap: 15px; /* PROPER SPACE BETWEEN BUTTONS */
     }
 
-    .float-btn {
-        padding: 10px 22px;
+    .btn-link {
+        padding: 8px 20px;
         border-radius: 50px;
         color: white !important;
         text-decoration: none;
         font-weight: bold;
         font-size: 14px;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-        transition: all 0.3s ease;
+        transition: transform 0.2s ease;
     }
 
-    .float-btn:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 6px 15px rgba(0,0,0,0.3);
+    .btn-link:hover {
+        transform: scale(1.05);
+        color: white;
     }
 
-    .linkedin-btn { background-color: #0077b5; }
-    .portfolio-btn { background-color: #24292e; }
+    .li-btn { background-color: #0077b5; }
+    .pf-btn { background-color: #333333; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -107,10 +104,11 @@ if "GEMINI_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
     model = genai.GenerativeModel('gemini-1.5-flash-latest')
 else:
-    st.error("API Key Missing in Secrets Management.")
+    st.error("API Key Missing in Secrets.")
     st.stop()
 
-# 4. SIDEBAR - CONTROL PANEL (RESTORED SECTION)
+# 4. SIDEBAR - CONTROL PANEL (FIXED)
+# This MUST be outside any conditional blocks to always show
 with st.sidebar:
     st.title("Control Panel")
     st.divider()
@@ -127,13 +125,13 @@ with st.sidebar:
     include_edge = st.toggle("Edge Case Analysis", value=True)
     
     st.divider()
-    st.success("System: Online ✅")
+    st.success("System Ready ✅")
 
 # 5. MAIN CONTENT
 st.markdown('<h1 class="hero-title">TestcaseCraft Pro</h1>', unsafe_allow_html=True)
-st.markdown("<p style='text-align:center; color:#1e293b; font-weight:500; font-size:1.1rem;'>Enterprise AI Engine for QA Requirement Analysis</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center; color:#1e293b; font-weight:500;'>Enterprise AI Engine for QA Requirement Analysis</p>", unsafe_allow_html=True)
 
-# 6. CACHED GENERATION (Fixes 429 Error)
+# 6. CACHED GENERATION
 @st.cache_data(show_spinner=False, ttl=3600)
 def generate_cached_matrix(pdf_text, detail, framework, neg, edge, focus):
     prompt = f"QA Lead: Generate a markdown matrix for this BRD. Style: {framework}. Focus: {focus}. Depth: {detail}. Include Negative: {neg}. Edge: {edge}. Content: {pdf_text[:12000]}"
@@ -142,7 +140,7 @@ def generate_cached_matrix(pdf_text, detail, framework, neg, edge, focus):
     except Exception as e:
         return f"ERROR: {str(e)}"
 
-# 7. MAIN WORKSPACE
+# 7. WORKSPACE
 uploaded_file = st.file_uploader("Upload BRD (PDF Format)", type="pdf")
 
 if uploaded_file:
@@ -152,11 +150,9 @@ if uploaded_file:
     if st.button("🚀 Analyze and Generate Matrix"):
         with st.status("AI Analysis in Progress...", expanded=True) as status:
             response = generate_cached_matrix(text, detail_level, test_framework, include_neg, include_edge, priority_focus)
-            
             if "ERROR" in str(response):
-                st.error(f"⚠️ Quota Reached or System Error. Please wait 60s.")
+                st.error("⚠️ System Error. Check API/Quota.")
                 st.stop()
-            
             status.update(label="Analysis Complete!", state="complete", expanded=False)
 
         st.markdown("### 📊 Generated Test Matrix")
@@ -165,14 +161,14 @@ if uploaded_file:
 else:
     st.info("👋 Welcome! Please upload your PDF document to activate the analysis engine.")
 
-# 8. ALIGNED BOTTOM BAR (Copyright + Socials)
+# 8. THE ALIGNED FOOTER BAR
 st.markdown(
     f"""
-    <div class="bottom-bar">
-        <div class="copyright-text">© 2026 | Subhan Khan Pathan</div>
-        <div class="social-group">
-            <a href="https://www.linkedin.com/in/pathan-subhan-khan-256547147/" class="float-btn linkedin-btn" target="_blank">LinkedIn</a>
-            <a href="https://subhankhanpathan99.github.io/" class="float-btn portfolio-btn" target="_blank">Portfolio</a>
+    <div class="fixed-footer">
+        <div class="footer-text">© 2026 | Subhan Khan Pathan</div>
+        <div class="footer-buttons">
+            <a href="https://www.linkedin.com/in/pathan-subhan-khan-256547147/" class="btn-link li-btn" target="_blank">LinkedIn</a>
+            <a href="https://subhankhanpathan99.github.io/" class="btn-link pf-btn" target="_blank">Portfolio</a>
         </div>
     </div>
     """, 
