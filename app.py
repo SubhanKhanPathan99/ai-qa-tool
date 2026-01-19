@@ -12,9 +12,10 @@ st.set_page_config(
     initial_sidebar_state="expanded" 
 )
 
-# 2. ADVANCED CSS: #27F5C2 THEME & ALIGNMENT
+# 2. ADVANCED CSS: COLOR #27F5C2 & ALIGNMENT
 st.markdown("""
     <style>
+    /* HIDE STREAMLIT UI */
     header {visibility: hidden;}
     footer {visibility: hidden;}
     .stAppDeployButton {display: none;}
@@ -22,14 +23,17 @@ st.markdown("""
     [data-testid="stStatusWidget"] {display: none !important;}
     button[data-testid="manage-app-button"] {display: none !important;}
 
+    /* THEME COLOR #27F5C2 */
     .stApp { background-color: #27F5C2; }
 
+    /* REMOVE GAPS */
     .block-container {
         padding-top: 0rem !important;
         margin-top: -4rem !important; 
         max-width: 95%;
     }
 
+    /* GLASSMORPHISM WORKSPACE */
     div[data-testid="stVerticalBlock"] > div:has(div.stMarkdown) {
         background: rgba(255, 255, 255, 0.95);
         backdrop-filter: blur(10px);
@@ -46,6 +50,7 @@ st.markdown("""
         margin-bottom: 0px;
     }
 
+    /* PERFECTLY ALIGNED BOTTOM BAR */
     .footer-container {
         position: fixed;
         bottom: 0;
@@ -70,16 +75,19 @@ st.markdown("""
         text-decoration: none;
         font-weight: bold;
         font-size: 14px;
+        transition: transform 0.2s ease;
     }
+    .social-link:hover { transform: scale(1.05); }
     .li-color { background-color: #0077b5; }
     .pf-color { background-color: #333333; }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. SECURE API INITIALIZATION
+# 3. SECURE API INITIALIZATION (MODEL FIX)
 if "GEMINI_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    model = genai.GenerativeModel('gemini-2.5-flash-latest')
+    # FIXED: Explicit model name to resolve 404 error
+    model = genai.GenerativeModel('gemini-1.5-flash') 
 else:
     st.error("API Key Missing in Streamlit Secrets.")
     st.stop()
@@ -88,7 +96,7 @@ else:
 with st.sidebar:
     st.title("Control Panel")
     st.divider()
-    st.success("Account: Tier 1 Active ✅")
+    st.success("Account Status: Tier 1 ✅")
 
 # 5. MAIN CONTENT
 st.markdown('<h1 class="hero-title">TestcaseCraft Pro</h1>', unsafe_allow_html=True)
@@ -99,20 +107,20 @@ st.markdown("<p style='text-align:center; color:#1e293b; font-weight:600; font-s
 def generate_cached_matrix(pdf_text, detail, framework, neg, edge, focus):
     prompt = f"QA Lead: Generate a markdown matrix for this BRD. Style: {framework}. Focus: {focus}. Depth: {detail}. Include Negative: {neg}. Edge: {edge}. Content: {pdf_text[:12000]}"
     
-    # Tier 1 allows retrying if the minute limit is hit
+    # Retry logic for Tier 1 minute limits
     for attempt in range(3):
         try:
             return model.generate_content(prompt)
         except google.api_core.exceptions.ResourceExhausted:
             if attempt < 2:
-                time.sleep(5) # Wait 5 seconds and try again
+                time.sleep(5)
                 continue
             return "QUOTA_EXCEEDED"
         except Exception as e:
             return f"ERROR: {str(e)}"
 
 # 7. WORKSPACE
-uploaded_file = st.file_uploader("Step 1: Upload BRD (PDF Format)", type="pdf")
+uploaded_file = st.file_uploader("Step 1: Upload BRD (PDF)", type="pdf")
 
 if uploaded_file:
     reader = PdfReader(uploaded_file)
@@ -148,15 +156,14 @@ if uploaded_file:
         # CLEAR THE STATUS BOX ENTIRELY
         status_placeholder.empty()
 
-        # SHOW RESULTS
         st.markdown("---")
         st.subheader("📊 Generated Test Matrix")
         st.markdown(response.text)
-        st.download_button("📥 Export CSV", response.text, "QA_Matrix.csv", "text/csv")
+        st.download_button("📥 Export Matrix to CSV", response.text, "QA_Matrix.csv", "text/csv")
 else:
-    st.info("👋 Welcome! Please upload your PDF document.")
+    st.info("👋 Welcome! Please upload your PDF document to activate the analysis engine.")
 
-# 8. FOOTER
+# 8. THE CORRECTLY ALIGNED FOOTER BAR
 st.markdown(
     f"""
     <div class="footer-container">
@@ -166,5 +173,6 @@ st.markdown(
             <a href="https://subhankhanpathan99.github.io/" class="social-link pf-color" target="_blank">Portfolio</a>
         </div>
     </div>
-    """, unsafe_allow_html=True
+    """, 
+    unsafe_allow_html=True
 )
