@@ -20,7 +20,8 @@ st.markdown("""
     footer {visibility: hidden;}
     .stAppDeployButton {display: none;}
     #MainMenu {visibility: hidden;}
-    [data-testid="stStatusWidget"] {display: none !important;}
+    [data-testid="stStatusWidget"] {visibility: hidden;}
+
     button[data-testid="manage-app-button"] {display: none !important;}
 
     /* THEME COLOR #27F5C2 */
