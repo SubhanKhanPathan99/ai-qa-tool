@@ -15,43 +15,116 @@ st.set_page_config(
 )
 
 # =========================================================
-# 2. UI STYLING (UNCHANGED)
+# 2. GLOBAL CSS (HIDE MANAGE BUTTON + ANIMATED BACKGROUND)
 # =========================================================
 st.markdown("""
 <style>
-header, footer, #MainMenu {visibility: hidden;}
-.stApp { background-color: #27F5C2; }
-.block-container { margin-top: -4rem; max-width: 95%; }
 
+/* -------------------------------
+   HIDE STREAMLIT UI ELEMENTS
+-------------------------------- */
+header {visibility: hidden;}
+footer {visibility: hidden;}
+#MainMenu {visibility: hidden;}
+.stAppDeployButton {display: none !important;}
+button[title="Manage app"] {display: none !important;}
+div[data-testid="stStatusWidget"] {display: none !important;}
+
+/* Extra safety for floating Cloud UI */
+div[style*="position: fixed"][style*="bottom"] {
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+/* -------------------------------
+   ANIMATED GRADIENT BACKGROUND
+-------------------------------- */
+.stApp {
+    background: linear-gradient(
+        -45deg,
+        #27F5C2,
+        #4ade80,
+        #22d3ee,
+        #34d399
+    );
+    background-size: 400% 400%;
+    animation: gradientBG 18s ease infinite;
+}
+
+@keyframes gradientBG {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+/* -------------------------------
+   LAYOUT TUNING
+-------------------------------- */
+.block-container {
+    padding-top: 0rem !important;
+    margin-top: -4rem !important;
+    max-width: 95%;
+}
+
+/* -------------------------------
+   GLASSMORPHIC CONTENT CARDS
+-------------------------------- */
+div[data-testid="stVerticalBlock"] > div:has(div.stMarkdown) {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(12px);
+    border-radius: 20px;
+    padding: 30px;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* -------------------------------
+   TYPOGRAPHY
+-------------------------------- */
 .hero-title {
     font-size: 3.5rem;
     font-weight: 900;
-    text-align: center;
     color: #1e293b;
+    text-align: center;
+    margin-bottom: 0px;
 }
 
+/* -------------------------------
+   FOOTER
+-------------------------------- */
 .footer-container {
     position: fixed;
     bottom: 0;
+    left: 0;
     width: 100%;
-    background: rgba(255,255,255,0.9);
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(10px);
     display: flex;
     justify-content: space-between;
+    align-items: center;
     padding: 12px 40px;
+    z-index: 9999;
+    border-top: 1px solid rgba(0,0,0,0.1);
 }
+
+.footer-socials { display: flex; gap: 15px; }
+
 .social-link {
     padding: 10px 24px;
-    color: white;
-    font-weight: bold;
     border-radius: 50px;
+    color: white !important;
+    text-decoration: none;
+    font-weight: bold;
+    font-size: 14px;
 }
-.li-color { background:#0077b5; }
-.pf-color { background:#333; }
+
+.li-color { background-color: #0077b5; }
+.pf-color { background-color: #333333; }
+
 </style>
 """, unsafe_allow_html=True)
 
 # =========================================================
-# 3. API KEY VALIDATION
+# 3. GEMINI API INITIALIZATION (STABLE)
 # =========================================================
 if "GEMINI_API_KEY" not in st.secrets:
     st.error("❌ GEMINI_API_KEY missing in Streamlit secrets")
@@ -59,14 +132,8 @@ if "GEMINI_API_KEY" not in st.secrets:
 
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
-# =========================================================
-# 4. MODEL INITIALIZATION (FUTURE-SAFE)
-# =========================================================
+# Primary + fallback (future-safe)
 def load_model():
-    """
-    Primary: gemini-flash-latest (stable alias)
-    Fallback: gemini-pro (older but reliable)
-    """
     try:
         return genai.GenerativeModel("gemini-flash-latest")
     except Exception:
@@ -74,9 +141,7 @@ def load_model():
 
 model = load_model()
 
-# =========================================================
-# 5. MODEL HEALTH CHECK (PREVENTS SILENT FAILURE)
-# =========================================================
+# Health check
 try:
     _ = model.generate_content("health check")
 except Exception:
@@ -84,27 +149,28 @@ except Exception:
     st.stop()
 
 # =========================================================
-# 6. SIDEBAR
+# 4. SIDEBAR
 # =========================================================
 with st.sidebar:
     st.title("Control Panel")
+    st.divider()
     st.success("Account Status: Tier 1 ✅")
 
 # =========================================================
-# 7. MAIN HEADER
+# 5. HEADER
 # =========================================================
 st.markdown('<h1 class="hero-title">TestcaseCraft Pro</h1>', unsafe_allow_html=True)
 st.markdown(
-    "<p style='text-align:center;font-weight:600;'>"
+    "<p style='text-align:center; color:#1e293b; font-weight:600; font-size:1.1rem;'>"
     "Professional AI Engine for QA Requirement Analysis</p>",
     unsafe_allow_html=True
 )
 
 # =========================================================
-# 8. CORE GENERATION FUNCTION (SAFE + RETRY)
+# 6. CORE GENERATION FUNCTION
 # =========================================================
 @st.cache_data(show_spinner=False, ttl=3600)
-def generate_test_matrix(pdf_text, detail, framework, neg, edge, focus):
+def generate_cached_matrix(pdf_text, detail, framework, neg, edge, focus):
 
     prompt = f"""
 You are a Senior QA Lead.
@@ -143,15 +209,13 @@ BRD CONTENT:
     return "ERROR: Generation failed after retries."
 
 # =========================================================
-# 9. FILE UPLOAD
+# 7. WORKSPACE
 # =========================================================
-uploaded_file = st.file_uploader("📄 Upload BRD PDF", type="pdf")
+uploaded_file = st.file_uploader("📄 Upload BRD (PDF)", type="pdf")
 
 if uploaded_file:
     reader = PdfReader(uploaded_file)
-
-    # SAFE TEXT EXTRACTION
-    pdf_text = "".join([page.extract_text() or "" for page in reader.pages])
+    pdf_text = "".join([p.extract_text() or "" for p in reader.pages])
 
     st.markdown("### ⚙️ Test Strategy Configuration")
 
@@ -174,11 +238,11 @@ if uploaded_file:
 
     with col2:
         include_neg = st.toggle("🧪 Include Negative Cases", True)
-        include_edge = st.toggle("⚡ Include Edge Cases", True)
+        include_edge = st.toggle("⚡ Include Edge Analysis", True)
 
     if st.button("🚀 Analyze and Generate Matrix"):
         with st.status("AI Analysis in Progress..."):
-            result = generate_test_matrix(
+            result = generate_cached_matrix(
                 pdf_text,
                 detail_level,
                 test_framework,
@@ -195,7 +259,7 @@ if uploaded_file:
         else:
             st.markdown(result)
             st.download_button(
-                "📥 Download Matrix",
+                "📥 Export Matrix",
                 result,
                 "QA_Test_Matrix.md",
                 "text/markdown"
@@ -205,14 +269,16 @@ else:
     st.info("👋 Upload a BRD PDF to begin.")
 
 # =========================================================
-# 10. FOOTER
+# 8. FOOTER
 # =========================================================
 st.markdown("""
 <div class="footer-container">
-  <div>© 2026 | Subhan Khan Pathan</div>
-  <div>
-    <a class="social-link li-color" href="https://www.linkedin.com/">LinkedIn</a>
-    <a class="social-link pf-color" href="https://example.com/">Portfolio</a>
-  </div>
+    <div>© 2026 | Subhan Khan Pathan</div>
+    <div class="footer-socials">
+        <a href="https://www.linkedin.com/in/pathan-subhan-khan-256547147/"
+           class="social-link li-color" target="_blank">LinkedIn</a>
+        <a href="https://subhankhanpathan99.github.io/"
+           class="social-link pf-color" target="_blank">Portfolio</a>
+    </div>
 </div>
 """, unsafe_allow_html=True)
