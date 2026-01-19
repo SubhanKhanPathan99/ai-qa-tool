@@ -4,51 +4,58 @@ from PyPDF2 import PdfReader
 import google.api_core.exceptions
 import io
 
-# 1. PAGE CONFIGURATION - FORCING SIDEBAR VISIBILITY
+# 1. PAGE CONFIGURATION
 st.set_page_config(
     page_title="TestcaseCraft Pro | Enterprise QA",
     page_icon="🧪",
     layout="wide",
-    initial_sidebar_state="expanded" # This ensures the left bar is open by default
+    initial_sidebar_state="expanded"
 )
 
-# 2. ADVANCED CSS: BURGUNDY THEME & FLOATING SOCIAL BUTTONS
+# 2. ADVANCED CSS: CUSTOM COLOR, GAP FIXES & FLOATING SOCIALS
 st.markdown("""
     <style>
-    /* HIDE STREAMLIT ELEMENTS */
+    /* HIDE ALL STREAMLIT DEVELOPER OVERLAYS */
     header {visibility: hidden;}
     footer {visibility: hidden;}
     .stAppDeployButton {display: none;}
     #MainMenu {visibility: hidden;}
     [data-testid="stStatusWidget"] {display: none !important;}
+    
+    /* ABSOLUTE HIDE FOR 'MANAGE APP' AND VIEWER BADGE */
     button[data-testid="manage-app-button"] {display: none !important;}
+    .viewerBadge_container__1QSob {display: none !important;}
+    .st-emotion-cache-zq5wms {display: none !important;}
 
-    /* LAYOUT OPTIMIZATION */
+    /* REMOVE TOP WHITESPACE (ABOVE TITLE) */
     .block-container {
         padding-top: 0rem !important;
         margin-top: -3.5rem !important; 
         max-width: 95%;
     }
 
-    /* BURGUNDY ANIMATED BACKGROUND */
-    .stApp {
-        background: linear-gradient(-45deg, #4a0404, #630d0d, #800000, #a52a2a);
-        background-size: 400% 400%;
-        animation: gradientBG 15s ease infinite;
+    /* FIX SIDEBAR GAPS */
+    [data-testid="stSidebar"] > div:first-child {
+        padding-top: 0.5rem !important;
     }
-    @keyframes gradientBG {
-        0% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-        100% { background-position: 0% 50%; }
+    [data-testid="stSidebar"] [data-testid="stVerticalBlock"] {
+        gap: 0.8rem !important;
     }
 
-    /* GLASSMORPHISM WORKSPACE */
+    /* CUSTOM BACKGROUND COLOR: #A0A300 */
+    .stApp {
+        background-color: #A0A300;
+        background-attachment: fixed;
+    }
+
+    /* GLASSMORPHISM BOXES - High contrast for the new background */
     div[data-testid="stVerticalBlock"] > div:has(div.stMarkdown) {
         background: rgba(255, 255, 255, 0.95);
         backdrop-filter: blur(10px);
         border-radius: 20px;
         padding: 25px;
-        border: 1px solid rgba(255, 255, 255, 0.2);
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
     }
     
     .hero-title {
@@ -57,53 +64,55 @@ st.markdown("""
         color: #ffffff;
         text-align: center;
         margin-bottom: 0px;
+        text-shadow: 2px 2px 10px rgba(0,0,0,0.2);
     }
 
-    /* FLOATING ACTION BUTTONS (SOCIALS) */
+    /* FLOATING ACTION BUTTONS (SOCIALS) WITH SPACING */
     .float-container {
         position: fixed;
-        bottom: 20px;
-        right: 20px;
+        bottom: 30px;
+        right: 30px;
         z-index: 1000;
         display: flex;
-        flex-direction: row; /* Horizontal layout */
-        gap: 15px; /* Space between the two buttons */
+        flex-direction: row; 
+        gap: 20px; /* Increased space between buttons */
     }
 
     .float-btn {
-        padding: 12px 20px;
-        border-radius: 30px;
+        padding: 12px 25px;
+        border-radius: 50px;
         color: white !important;
         text-decoration: none;
         font-weight: bold;
         font-size: 14px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-        transition: transform 0.3s ease;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+        transition: all 0.3s ease;
         display: flex;
         align-items: center;
-        justify-content: center;
     }
 
     .float-btn:hover {
-        transform: translateY(-5px);
+        transform: scale(1.1);
         color: white;
     }
 
     .linkedin-btn { background-color: #0077b5; }
-    .portfolio-btn { background-color: #333; }
+    .portfolio-btn { background-color: #24292e; }
 
     /* COPYRIGHT TEXT */
     .copyright {
         position: fixed;
-        bottom: 20px;
-        left: 20px;
-        color: rgba(255, 255, 255, 0.6);
-        font-size: 0.8rem;
+        bottom: 30px;
+        left: 30px;
+        color: #ffffff;
+        font-weight: 500;
+        font-size: 0.9rem;
+        text-shadow: 1px 1px 3px rgba(0,0,0,0.2);
     }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. API INITIALIZATION
+# 3. SECURE API INITIALIZATION
 if "GEMINI_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
     model = genai.GenerativeModel('gemini-1.5-flash-latest')
@@ -111,7 +120,7 @@ else:
     st.error("API Key Missing in Secrets.")
     st.stop()
 
-# 4. SIDEBAR - THE CONTROL PANEL (THE LEFT BAR)
+# 4. SIDEBAR - CONTROL PANEL (FORCED LEFT BAR)
 with st.sidebar:
     st.title("Control Panel")
     st.subheader("🛠️ Core Settings")
@@ -125,13 +134,13 @@ with st.sidebar:
     include_neg = st.toggle("Negative Scenarios", value=True)
     include_edge = st.toggle("Edge Case Analysis", value=True)
     st.divider()
-    st.success("System Ready ✅")
+    st.success("Engine Status: Online ✅")
 
-# 5. MAIN INTERFACE
+# 5. MAIN WEBSITE TITLE
 st.markdown('<h1 class="hero-title">TestcaseCraft Pro</h1>', unsafe_allow_html=True)
-st.markdown("<p style='text-align:center; color:#fca5a5;'>Enterprise AI Engine for QA Requirement Analysis</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center; color:#ffffff; font-size:1.1rem; font-weight: 500;'>Enterprise AI Engine for QA Requirement Analysis</p>", unsafe_allow_html=True)
 
-# 6. CACHED GENERATION
+# 6. CACHED GENERATION (Prevents 429 Errors)
 @st.cache_data(show_spinner=False, ttl=3600)
 def generate_cached_matrix(pdf_text, detail, framework, neg, edge, focus):
     prompt = f"QA Lead: Generate a markdown matrix for this BRD. Style: {framework}. Focus: {focus}. Depth: {detail}. Include Negative: {neg}. Edge: {edge}. Content: {pdf_text[:12000]}"
@@ -140,8 +149,8 @@ def generate_cached_matrix(pdf_text, detail, framework, neg, edge, focus):
     except Exception as e:
         return f"ERROR: {str(e)}"
 
-# 7. WORKSPACE
-uploaded_file = st.file_uploader("Upload BRD (PDF)", type="pdf")
+# 7. MAIN WORKSPACE
+uploaded_file = st.file_uploader("Upload Business Requirement Document (PDF)", type="pdf")
 
 if uploaded_file:
     reader = PdfReader(uploaded_file)
