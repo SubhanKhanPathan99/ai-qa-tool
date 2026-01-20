@@ -17,7 +17,7 @@ st.set_page_config(
 )
 
 # =========================================================
-# 2. GLOBAL CSS (ANIMATION + GLASS + FOOTER)
+# 2. GLOBAL CSS (FIXED SPACING + ANIMATION + FOOTER)
 # =========================================================
 st.markdown("""
 <style>
@@ -25,6 +25,14 @@ st.markdown("""
 /* Hide Streamlit default UI */
 header, footer, #MainMenu {visibility: hidden;}
 .stAppDeployButton {display: none !important;}
+
+/* Remove empty top spacer blocks */
+div[data-testid="stVerticalBlock"]:empty {
+    display: none !important;
+}
+div[data-testid="stAnchor"] {
+    display: none !important;
+}
 
 /* Animated background */
 .stApp {
@@ -39,9 +47,10 @@ header, footer, #MainMenu {visibility: hidden;}
     100% {background-position: 0% 50%;}
 }
 
-/* Layout */
+/* Layout fix */
 .block-container {
-    margin-top: -4rem;
+    padding-top: 0 !important;
+    margin-top: -6rem !important;
     max-width: 95%;
 }
 
@@ -161,7 +170,7 @@ BRD CONTENT:
     return "ERROR: Generation failed."
 
 # =========================================================
-# 6. MARKDOWN → EXCEL CONVERTER
+# 6. MARKDOWN → EXCEL CONVERTER (FIXED)
 # =========================================================
 def markdown_to_excel(markdown_text):
     lines = [line for line in markdown_text.splitlines() if "|" in line]
@@ -256,7 +265,7 @@ else:
     st.info("👋 Upload a BRD PDF to begin.")
 
 # =========================================================
-# 8. FOOTER (THIS IS THE FOOTER YOU ASKED FOR)
+# 8. FOOTER
 # =========================================================
 st.markdown("""
 <div class="footer-container">
