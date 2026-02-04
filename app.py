@@ -264,17 +264,4 @@ if uploaded_file:
 else:
     st.info("👋 Upload a BRD PDF to begin.")
 
-# =========================================================
-# 8. FOOTER
-# =========================================================
-st.markdown("""
-<div class="footer-container">
-    <div>© All Rights Reserved 2026 | Subhan Khan Pathan</div>
-    <div class="footer-socials">
-        <a href="https://www.linkedin.com/in/pathan-subhan-khan-256547147/"
-           class="social-link li-color" target="_blank">LinkedIn</a>
-        <a href="https://subhankhanpathan99.github.io/"
-           class="social-link pf-color" target="_blank">Portfolio</a>
-    </div>
-</div>
-""", unsafe_allow_html=True)
+
